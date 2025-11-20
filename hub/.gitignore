@@ -1,0 +1,41 @@
+# Dependencias
+node_modules/
+.pnp
+.pnp.js
+*.log
+*.lock
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Next.js
+.next/
+out/
+
+# Producción
+build
+
+# Testing
+coverage
+
+# Misc
+.DS_Store
+*.pem
+
+# Local env files
+.env*.local
+.vercel
+.env
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Editor
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -1,0 +1,59 @@
+import type { Client } from "@/lib/types"
+import type { MembershipPlan } from "@/lib/types"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { format } from "date-fns"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
+
+interface MembershipCardProps {
+  plan: MembershipPlan
+  client?: Client
+}
+
+export default function MembershipCard({ plan, client }: MembershipCardProps) {
+  return (
+    <Card className="p-6 border-2 border-primary/20">
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h3 className="text-2xl font-bold">{plan.name} Plan</h3>
+          <p className="text-muted-foreground">{plan.description}</p>
+        </div>
+        <Badge className="bg-primary">{client?.status || "active"}</Badge>
+      </div>
+
+      <div className="mb-6">
+        <p className="text-4xl font-bold">
+          ${plan.price}
+          <span className="text-lg text-muted-foreground">/month</span>
+        </p>
+      </div>
+
+      <div className="space-y-3 mb-6">
+        <h4 className="font-semibold">Included Features:</h4>
+        <ul className="space-y-2">
+          {plan.features.map((feature, i) => (
+            <li key={i} className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
+              {feature}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {client && (
+        <div className="pt-6 border-t space-y-2">
+          <div>
+            <p className="text-sm text-muted-foreground">Subscription Active Until</p>
+            <p className="font-semibold">{format(client.subscriptionEndDate, "MMM dd, yyyy")}</p>
+          </div>
+          <Link href="/client/payments">
+            <Button variant="outline" className="w-full mt-4 bg-transparent">
+              View Billing Details
+            </Button>
+          </Link>
+        </div>
+      )}
+    </Card>
+  )
+}
