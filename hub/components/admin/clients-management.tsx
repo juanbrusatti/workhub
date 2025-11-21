@@ -142,7 +142,7 @@ export default function ClientsManagement() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Membership Plan</label>
+              <label className="block text-sm font-medium mb-2">Planes de pago</label>
               <select
                 value={newClient.plan}
                 onChange={(e) => setNewClient({ ...newClient, plan: e.target.value })}
