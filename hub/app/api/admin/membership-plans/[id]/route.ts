@@ -31,84 +31,144 @@ async function ensureAdmin(request: Request) {
   return { response: null }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const { response } = await ensureAdmin(request)
-  if (response) return response
+export async function PATCH(
+  request: Request,
+  context: { params: { id: string } }
+) {
+  try {
+    const { response } = await ensureAdmin(request)
+    if (response) return response
 
-  const body = await request.json().catch(() => null)
-
-  if (!body) {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
-  }
-
-  const { id } = params
-
-  const { name, price, billingPeriod, capacity, description } = body as {
-    name?: string
-    price?: number
-    billingPeriod?: BillingPeriod
-    capacity?: number
-    description?: string | null
-  }
-
-  const updates: Record<string, unknown> = {}
-
-  if (name !== undefined) updates.name = name.trim()
-  if (price !== undefined) {
-    if (typeof price !== "number" || price < 0) {
-      return NextResponse.json({ error: "Invalid price" }, { status: 400 })
+    // En Next.js 16.0.3, los parámetros pueden entregarse como Promise
+    const params = await Promise.resolve(context.params)
+    const id = params?.id
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID del plan no proporcionado" },
+        { status: 400 }
+      )
     }
-    updates.price = price
-  }
-  if (capacity !== undefined) {
-    if (typeof capacity !== "number" || capacity < 1) {
-      return NextResponse.json({ error: "Invalid capacity" }, { status: 400 })
+
+    const body = await request.json().catch(() => null)
+    if (!body) {
+      return NextResponse.json({ error: "JSON inválido" }, { status: 400 })
     }
-    updates.capacity = capacity
-  }
-  if (billingPeriod !== undefined) {
-    if (!BILLING_PERIODS.includes(billingPeriod)) {
-      return NextResponse.json({ error: "Invalid billing period" }, { status: 400 })
+
+    const { name, price, billingPeriod, capacity, description } = body as {
+      name?: string
+      price?: number
+      billingPeriod?: BillingPeriod
+      capacity?: number
+      description?: string | null
     }
-    updates.billing_period = billingPeriod
+
+    const updates: Record<string, unknown> = {}
+
+    if (name !== undefined) updates.name = name.trim()
+    if (price !== undefined) {
+      if (typeof price !== "number" || price < 0) {
+        return NextResponse.json({ error: "Precio inválido" }, { status: 400 })
+      }
+      updates.price = price
+    }
+    if (capacity !== undefined) {
+      if (typeof capacity !== "number" || capacity < 1) {
+        return NextResponse.json({ error: "Capacidad inválida" }, { status: 400 })
+      }
+      updates.capacity = capacity
+    }
+    if (billingPeriod !== undefined) {
+      if (!["monthly", "daily", "hourly"].includes(billingPeriod)) {
+        return NextResponse.json({ error: "Período de facturación inválido" }, { status: 400 })
+      }
+      updates.billing_period = billingPeriod
+    }
+    if (description !== undefined) {
+      updates.description = description?.trim() || null
+    }
+
+    if (!Object.keys(updates).length) {
+      return NextResponse.json({ error: "No se proporcionaron actualizaciones" }, { status: 400 })
+    }
+
+    const supabase = getSupabaseAdminClient()
+    console.log('Actualizando plan con ID:', id, 'Datos:', updates)
+
+    const { data, error: updateError } = await supabase
+      .from("membership_plans")
+      .update(updates)
+      .eq("id", id)
+      .select("id, name, price, billing_period, capacity, description, created_at")
+      .single()
+
+    if (updateError) {
+      console.error("Error al actualizar el plan:", updateError)
+      return NextResponse.json(
+        { 
+          error: "Error al actualizar el plan",
+          details: updateError.message 
+        },
+        { status: 500 }
+      )
+    }
+
+    console.log('Plan actualizado exitosamente:', data)
+    return NextResponse.json({ plan: data })
+  } catch (error) {
+    console.error('Error en el servidor al actualizar el plan:', error)
+    return NextResponse.json(
+      { error: "Error interno del servidor al actualizar el plan" },
+      { status: 500 }
+    )
   }
-  if (description !== undefined) {
-    updates.description = description?.trim() || null
-  }
-
-  if (!Object.keys(updates).length) {
-    return NextResponse.json({ error: "No updates provided" }, { status: 400 })
-  }
-
-  const supabase = getSupabaseAdminClient()
-
-  const { data, error } = await supabase
-    .from("membership_plans")
-    .update(updates)
-    .eq("id", id)
-    .select("id, name, price, billing_period, capacity, description, created_at")
-    .single()
-
-  if (error) {
-    console.error("Failed to update membership plan", error)
-    return NextResponse.json({ error: "Failed to update membership plan" }, { status: 500 })
-  }
-
-  return NextResponse.json({ plan: data })
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const { response } = await ensureAdmin(request)
-  if (response) return response
+export async function DELETE(
+  request: Request,
+  context: { params: { id: string } }
+) {
+  try {
+    const { response } = await ensureAdmin(request);
+    if (response) return response;
 
-  const supabase = getSupabaseAdminClient()
+    // En Next.js 16.0.3, los parámetros pueden entregarse como Promise
+    const params = await Promise.resolve(context.params)
+    const id = params?.id
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: "ID del plan no proporcionado" },
+        { status: 400 }
+      );
+    }
 
-  const { error } = await supabase.from("membership_plans").delete().eq("id", params.id)
+    const supabase = getSupabaseAdminClient();
+    console.log('Eliminando plan con ID:', id);
 
-  if (error) {
-    console.error("Failed to delete membership plan", error)
-    return NextResponse.json({ error: "Failed to delete membership plan" }, { status: 500 })
+    const { error } = await supabase
+      .from("membership_plans")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error al eliminar el plan:", error)
+      return NextResponse.json(
+        { 
+          error: "Error al eliminar el plan",
+          details: error.message 
+        },
+        { status: 500 }
+      )
+    }
+
+    console.log('Plan eliminado exitosamente:', id) // Log de depuración
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error en el servidor al eliminar el plan:', error)
+    return NextResponse.json(
+      { error: "Error interno del servidor al eliminar el plan" },
+      { status: 500 }
+    )
   }
-
-  return NextResponse.json({ success: true })
 }

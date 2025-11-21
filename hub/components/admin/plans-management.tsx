@@ -182,36 +182,60 @@ export default function PlansManagement() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Seguro que deseas eliminar este plan?")) return
+    if (!id) {
+      console.error('Error: No se proporcionó un ID de plan válido')
+      setError('No se pudo identificar el plan a eliminar')
+      return
+    }
+
+    if (!confirm('¿Estás seguro que deseas eliminar este plan? Esta acción no se puede deshacer.')) {
+      return
+    }
 
     setDeletingId(id)
     setError(null)
 
     try {
       const token = await getIdToken()
-      if (!token) throw new Error("missing-token")
-
-      const response = await fetch(`/api/admin/membership-plans/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}))
-        throw new Error(payload.error || "No se pudo eliminar el plan")
+      if (!token) {
+        throw new Error('No se pudo obtener el token de autenticación')
       }
 
-      setPlans((prev) => prev.filter((plan) => plan.id !== id))
+      const response = await fetch(`/api/admin/membership-plans/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
 
+      const isJson = response.headers.get('content-type')?.includes('application/json')
+      const result = isJson ? await response.json() : null
+
+      if (!response.ok) {
+        throw new Error(result?.error || 'Error al eliminar el plan')
+      }
+
+      // Actualizar la lista de planes
+      setPlans(prevPlans => prevPlans.filter(plan => plan.id !== id))
+
+      // Si estábamos editando el plan que se eliminó, limpiar el formulario
       if (editingId === id) {
         setEditingId(null)
         setFormState(defaultFormState)
       }
-    } catch (err) {
-      console.error(err)
-      setError("No pudimos eliminar el plan. Intenta nuevamente.")
+
+      // Mostrar mensaje de éxito
+      // Puedes agregar un toast o notificación aquí si lo deseas
+      console.log('Plan eliminado exitosamente')
+
+    } catch (error) {
+      console.error('Error al eliminar el plan:', error)
+      setError(
+        error instanceof Error 
+          ? error.message 
+          : 'Ocurrió un error inesperado al intentar eliminar el plan.'
+      )
     } finally {
       setDeletingId(null)
     }
