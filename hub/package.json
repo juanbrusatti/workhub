@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
+    "predev": "tsx scripts/ensure-admin-user.ts",
     "dev": "next dev",
+    "build": "next build",
     "lint": "eslint .",
     "start": "next start",
-    "set-admin-role": "tsx scripts/set-admin-role.ts"
+    "set-admin-role": "tsx scripts/set-admin-role.ts",
+    "ensure-admin": "tsx scripts/ensure-admin-user.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
