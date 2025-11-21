@@ -284,9 +284,9 @@ export default function PlansManagement() {
         </AlertDialogContent>
       </AlertDialog>
       <div>
-        <h2 className="text-2xl font-bold mb-2">Planes de membresía</h2>
+        <h2 className="text-2xl font-bold mb-2">Planes de pago</h2>
         <p className="text-sm text-muted-foreground">
-          Administra los planes disponibles para tus clientes.
+          Administra los planes de pago disponibles para tus clientes.
         </p>
       </div>
 
