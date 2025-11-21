@@ -3,22 +3,120 @@
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { mockClients, mockMembershipPlans } from "@/lib/mock-data"
-import { useState } from "react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/components/ui/use-toast"
+import { Loader2, Plus, Users } from "lucide-react"
+import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { useAuth } from "@/lib/auth-context"
+import type { MembershipPlan } from "@/lib/types"
 
 export default function ClientsManagement() {
-  const [clients, setClients] = useState(mockClients)
+  const [clients, setClients] = useState<Array<{
+    id: string
+    userId: string
+    user: {
+      id: string
+      email: string
+      name: string
+      role: string
+      companyName: string
+      createdAt: Date
+    }
+    companyName: string
+    plan: MembershipPlan
+    subscriptionStartDate: Date
+    subscriptionEndDate: Date
+    status: 'active' | 'inactive' | 'suspended'
+    createdAt: Date
+  }>>([])
+  
+  const [plans, setPlans] = useState<MembershipPlan[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
-  const [newClient, setNewClient] = useState({ name: "", email: "", password: "", company: "", plan: "1" })
+  const [newClient, setNewClient] = useState({ 
+    name: "", 
+    email: "", 
+    password: "", 
+    company: "", 
+    plan: "" 
+  })
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const { getIdToken } = useAuth()
+  const { toast } = useToast()
+
+  // Cargar planes de pago al montar el componente
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const token = await getIdToken()
+        if (!token) return
+
+        const response = await fetch('/api/admin/membership-plans', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (response.ok) {
+          const payload = await response.json()
+          const fetchedPlans = Array.isArray(payload?.plans)
+            ? payload.plans
+            : Array.isArray(payload)
+              ? payload
+              : []
+
+          if (!Array.isArray(fetchedPlans)) {
+            throw new Error('Formato inesperado de planes')
+          }
+
+          setPlans(fetchedPlans)
+
+          if (fetchedPlans.length > 0) {
+            setNewClient(prev => {
+              const currentPlanExists = fetchedPlans.some(plan => plan.id === prev.plan)
+              return { ...prev, plan: currentPlanExists ? prev.plan : fetchedPlans[0].id }
+            })
+          } else {
+            setNewClient(prev => ({ ...prev, plan: "" }))
+          }
+        } else {
+          throw new Error('Error al cargar los planes de pago')
+        }
+      } catch (error) {
+        console.error('Error fetching plans:', error)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los planes de pago",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchPlans()
+  }, [getIdToken, toast])
 
   const handleAddClient = async () => {
     if (!newClient.name || !newClient.email || !newClient.password) {
-      setFormError("Please complete all required fields")
+      setFormError("Por favor completa todos los campos obligatorios")
+      return
+    }
+
+    // Validación de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(newClient.email)) {
+      setFormError("Por favor ingresa un correo electrónico válido")
+      return
+    }
+
+    // Validación de contraseña
+    if (newClient.password.length < 6) {
+      setFormError("La contraseña debe tener al menos 6 caracteres")
       return
     }
 
@@ -28,7 +126,7 @@ export default function ClientsManagement() {
     try {
       const token = await getIdToken()
       if (!token) {
-        setFormError("Your session expired. Please sign in again.")
+        setFormError("Tu sesión expiró. Vuelve a iniciar sesión.")
         return
       }
 
@@ -50,38 +148,54 @@ export default function ClientsManagement() {
       const payload = await response.json()
 
       if (!response.ok) {
-        setFormError(payload.error || "Failed to create client")
+        setFormError(payload.error || "No se pudo crear el cliente")
         return
       }
 
-      const selectedPlan =
-        mockMembershipPlans.find((plan) => plan.id === newClient.plan) || mockMembershipPlans[0]
+      // Obtener el plan seleccionado
+      const selectedPlan = plans.find(plan => plan.id === newClient.plan)
+      
+      if (!selectedPlan) {
+        throw new Error('No se pudo encontrar el plan seleccionado')
+      }
 
       const newClientEntry = {
-        id: payload.id,
-        userId: payload.id,
+        id: payload.uid || payload.id,
+        userId: payload.uid || payload.id,
         user: {
-          id: payload.id,
+          id: payload.uid || payload.id,
           email: newClient.email,
           name: newClient.name,
           role: "client" as const,
-          companyName: newClient.company,
+          companyName: newClient.company || '',
           createdAt: new Date(),
         },
-        companyName: newClient.company,
+        companyName: newClient.company || '',
         plan: selectedPlan,
         subscriptionStartDate: new Date(),
-        subscriptionEndDate: new Date(),
+        subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días después
         status: "active" as const,
         createdAt: new Date(),
       }
 
       setClients([newClientEntry, ...clients])
       setShowAddForm(false)
-      setNewClient({ name: "", email: "", password: "", company: "", plan: "1" })
+      // Resetear el formulario manteniendo el plan seleccionado
+      setNewClient({ 
+        name: "", 
+        email: "", 
+        password: "", 
+        company: "", 
+        plan: plans[0]?.id || "" 
+      })
+      
+      toast({
+        title: "Cliente creado",
+        description: `El cliente ${newClient.name} ha sido creado exitosamente`,
+      })
     } catch (error) {
       console.error(error)
-      setFormError("Unexpected error while creating client")
+      setFormError("Ocurrió un error inesperado al crear el cliente")
     } finally {
       setIsSubmitting(false)
     }
@@ -91,107 +205,192 @@ export default function ClientsManagement() {
     setClients(clients.map((c) => (c.id === clientId ? { ...c, status: newStatus } : c)))
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <Button onClick={() => setShowAddForm(!showAddForm)} className="gap-2">
-        {showAddForm ? "Cancel" : "+ Add New Client"}
-      </Button>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">Clientes</h2>
+          <p className="text-sm text-muted-foreground">
+            Gestiona los clientes y sus suscripciones
+          </p>
+        </div>
+        <Button 
+          onClick={() => setShowAddForm(!showAddForm)} 
+          className="gap-2"
+          disabled={isLoading}
+        >
+          {showAddForm ? (
+            <>
+              <span>Cancelar</span>
+            </>
+          ) : (
+            <>
+              <Plus className="h-4 w-4" />
+              <span>Nuevo Cliente</span>
+            </>
+          )}
+        </Button>
+      </div>
 
       {showAddForm && (
         <Card className="p-6 border">
-          <h3 className="text-lg font-bold mb-4">Create New Client</h3>
+          <h3 className="text-lg font-bold mb-4">Nuevo Cliente</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Client Name</label>
-              <input
+              <Label htmlFor="name">Nombre del cliente <span className="text-destructive">*</span></Label>
+              <Input
+                id="name"
                 type="text"
-                placeholder="John Doe"
+                placeholder="Juan Pérez"
                 value={newClient.name}
                 onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md bg-background"
+                className="mt-1"
               />
             </div>
+            
             <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
-              <input
-                type="password"
-                placeholder="Temporary password"
-                value={newClient.password}
-                onChange={(e) => setNewClient({ ...newClient, password: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md bg-background"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Email</label>
-              <input
+              <Label htmlFor="email">Correo electrónico <span className="text-destructive">*</span></Label>
+              <Input
+                id="email"
                 type="email"
-                placeholder="john@example.com"
+                placeholder="juan@ejemplo.com"
                 value={newClient.email}
                 onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md bg-background"
+                className="mt-1"
               />
             </div>
+            
             <div>
-              <label className="block text-sm font-medium mb-2">Company Name</label>
-              <input
+              <Label htmlFor="password">Contraseña temporal <span className="text-destructive">*</span></Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={newClient.password}
+                onChange={(e) => setNewClient({ ...newClient, password: e.target.value })}
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                El cliente podrá cambiar su contraseña después de iniciar sesión
+              </p>
+            </div>
+            
+            <div>
+              <Label htmlFor="company">Empresa (opcional)</Label>
+              <Input
+                id="company"
                 type="text"
-                placeholder="Company Inc"
+                placeholder="Nombre de la empresa"
                 value={newClient.company}
                 onChange={(e) => setNewClient({ ...newClient, company: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md bg-background"
+                className="mt-1"
               />
             </div>
+            
             <div>
-              <label className="block text-sm font-medium mb-2">Planes de pago</label>
-              <select
+              <Label>Plan de pago <span className="text-destructive">*</span></Label>
+              <Select
                 value={newClient.plan}
-                onChange={(e) => setNewClient({ ...newClient, plan: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md bg-background"
+                onValueChange={(value) => setNewClient({ ...newClient, plan: value })}
               >
-                <option value="1">Starter ($199/mo)</option>
-                <option value="2">Professional ($499/mo)</option>
-                <option value="3">Enterprise ($1,299/mo)</option>
-              </select>
+                <SelectTrigger className="w-full mt-1">
+                  <SelectValue placeholder="Selecciona un plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plans.map((plan) => (
+                    <SelectItem key={plan.id} value={plan.id}>
+                      {plan.name} (${plan.price}/mes)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Button onClick={handleAddClient} className="w-full">
-              {isSubmitting ? "Creating..." : "Create Client"}
-            </Button>
-            {formError && <p className="text-sm text-destructive text-center">{formError}</p>}
+            {formError && (
+              <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-md">
+                {formError}
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-2 pt-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAddForm(false)}
+                disabled={isSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleAddClient} 
+                disabled={isSubmitting || !newClient.plan}
+                className="gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Creando...</span>
+                  </>
+                ) : (
+                  <span>Crear Cliente</span>
+                )}
+              </Button>
+            </div>
           </div>
         </Card>
       )}
 
-      <div className="space-y-3">
-        {clients.map((client) => (
-          <Card key={client.id} className="p-6 border">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
-              <div>
-                <h3 className="text-lg font-bold">{client.user.name}</h3>
-                <p className="text-sm text-muted-foreground">{client.user.email}</p>
-                <p className="text-sm font-medium mt-1">{client.companyName}</p>
-                <p className="text-xs text-muted-foreground mt-1">Joined {format(client.createdAt, "MMM dd, yyyy")}</p>
-              </div>
-
-              <div className="flex flex-col items-start md:items-end gap-3">
-                <div className="flex gap-2 items-center">
-                  <Badge className="bg-primary">{client.plan.name}</Badge>
-                  <Badge variant={client.status === "active" ? "default" : "secondary"}>{client.status}</Badge>
+      {clients.length === 0 && !showAddForm ? (
+        <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-lg">
+          <Users className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-1">No hay clientes</h3>
+          <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
+            Aún no has agregado ningún cliente. Haz clic en "Nuevo Cliente" para comenzar.
+          </p>
+          <Button onClick={() => setShowAddForm(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Cliente
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {clients.map((client) => (
+            <Card key={client.id} className="p-6 border">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                <div>
+                  <h3 className="text-lg font-bold">{client.user.name}</h3>
+                  <p className="text-sm text-muted-foreground">{client.user.email}</p>
+                  <p className="text-sm font-medium mt-1">{client.companyName}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Joined {format(client.createdAt, "MMM dd, yyyy")}</p>
                 </div>
 
-                <select
-                  value={client.status}
-                  onChange={(e) => handleStatusChange(client.id, e.target.value as any)}
-                  className="px-3 py-1 text-sm border rounded-md bg-background"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="suspended">Suspended</option>
-                </select>
+                <div className="flex flex-col items-start md:items-end gap-3">
+                  <div className="flex gap-2 items-center">
+                    <Badge className="bg-primary">{client.plan.name}</Badge>
+                    <Badge variant={client.status === "active" ? "default" : "secondary"}>{client.status}</Badge>
+                  </div>
+
+                  <select
+                    value={client.status}
+                    onChange={(e) => handleStatusChange(client.id, e.target.value as any)}
+                    className="px-3 py-1 text-sm border rounded-md bg-background"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
