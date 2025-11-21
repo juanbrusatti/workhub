@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { ChevronDown, Plus } from "lucide-react"
 
 type BillingPeriod = "monthly" | "daily" | "hourly"
 
@@ -48,6 +50,7 @@ export default function PlansManagement() {
   const [formState, setFormState] = useState<PlanFormState>(defaultFormState)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isFormOpen, setIsFormOpen] = useState(false)
 
   const fetchPlans = async () => {
     setLoading(true)
@@ -88,6 +91,9 @@ export default function PlansManagement() {
   const startCreate = () => {
     setEditingId(null)
     setFormState(defaultFormState)
+    if (!isFormOpen) {
+      setIsFormOpen(true)
+    }
   }
 
   const startEdit = (plan: MembershipPlan) => {
@@ -100,9 +106,10 @@ export default function PlansManagement() {
       capacity: plan.capacity.toString(),
       description: plan.description || "",
     })
+    setIsFormOpen(true)
   }
 
-  const currentActionLabel = useMemo(() => (editingId ? "Guardar cambios" : "Crear plan"), [editingId])
+  // Eliminamos currentActionLabel ya que ahora usamos texto condicional directamente en el botón
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -215,99 +222,136 @@ export default function PlansManagement() {
       <div>
         <h2 className="text-2xl font-bold mb-2">Planes de membresía</h2>
         <p className="text-sm text-muted-foreground">
-          Administra los planes disponibles para tus clientes. Toda la información visible se muestra en español.
+          Administra los planes disponibles para tus clientes.
         </p>
       </div>
 
-      <Card className="p-6 border">
-        <div className="flex items-center justify-between mb-4">
+      <Collapsible 
+        open={isFormOpen} 
+        onOpenChange={setIsFormOpen}
+        className="space-y-4"
+      >
+        <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">
-            {editingId ? "Editar plan" : "Crear nuevo plan"}
+            {editingId ? "Editar plan" : "Gestionar planes"}
           </h3>
-          <Button variant="outline" onClick={startCreate} disabled={saving}>
-            Reiniciar formulario
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                startCreate()
+                if (!isFormOpen) setIsFormOpen(true)
+              }}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              {editingId ? "Nuevo plan" : "Agregar plan"}
+            </Button>
+            
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="w-9 p-0">
+                <ChevronDown className={`h-4 w-4 transition-transform ${isFormOpen ? 'rotate-180' : ''}`} />
+                <span className="sr-only">Mostrar/ocultar formulario</span>
+              </Button>
+            </CollapsibleTrigger>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-2">Nombre</label>
-            <Input
-              value={formState.name}
-              onChange={(e) => handleInputChange("name", e.target.value)}
-              placeholder="Plan Ejecutivo"
-              required
-            />
-          </div>
+        <CollapsibleContent className="CollapsibleContent">
+          <Card className="p-6 border">
+            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-2">Nombre</label>
+                <Input
+                  value={formState.name}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  placeholder="Plan Ejecutivo"
+                  required
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Precio</label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={formState.price}
-              onChange={(e) => handleInputChange("price", e.target.value)}
-              placeholder="0.00"
-              required
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Precio</label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formState.price}
+                  onChange={(e) => handleInputChange("price", e.target.value)}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Tipo de precio</label>
-            <Select
-              value={formState.billingPeriod}
-              onValueChange={(value: BillingPeriod) => handleInputChange("billingPeriod", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona un periodo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="monthly">Mensual</SelectItem>
-                <SelectItem value="daily">Por día</SelectItem>
-                <SelectItem value="hourly">Por hora</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Tipo de precio</label>
+                <Select
+                  value={formState.billingPeriod}
+                  onValueChange={(value: BillingPeriod) => handleInputChange("billingPeriod", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un periodo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Mensual</SelectItem>
+                    <SelectItem value="daily">Por día</SelectItem>
+                    <SelectItem value="hourly">Por hora</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Cantidad de personas</label>
-            <Input
-              type="number"
-              min="1"
-              step="1"
-              value={formState.capacity}
-              onChange={(e) => handleInputChange("capacity", e.target.value)}
-              placeholder="1"
-              required
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Cantidad de personas</label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={formState.capacity}
+                  onChange={(e) => handleInputChange("capacity", e.target.value)}
+                  placeholder="1"
+                  required
+                />
+              </div>
 
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-2">Descripción</label>
-            <Textarea
-              value={formState.description}
-              onChange={(e) => handleInputChange("description", e.target.value)}
-              placeholder="Incluye detalles o beneficios principales"
-            />
-          </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-2">Descripción</label>
+                <Textarea
+                  value={formState.description}
+                  onChange={(e) => handleInputChange("description", e.target.value)}
+                  placeholder="Incluye detalles o beneficios principales"
+                />
+              </div>
 
-          {error && (
-            <p className="md:col-span-2 text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{error}</p>
-          )}
+              {error && (
+                <div className="md:col-span-2">
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+                    {error}
+                  </p>
+                </div>
+              )}
 
-          <div className="md:col-span-2 flex gap-3 justify-end">
-            {editingId && (
-              <Button type="button" variant="outline" onClick={startCreate} disabled={saving}>
-                Cancelar
-              </Button>
-            )}
-            <Button type="submit" disabled={saving}>
-              {saving ? "Guardando..." : currentActionLabel}
-            </Button>
-          </div>
-        </form>
-      </Card>
+              <div className="md:col-span-2 flex gap-3 justify-end pt-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => {
+                    setFormState(defaultFormState)
+                    setEditingId(null)
+                  }}
+                  disabled={saving}
+                >
+                  Limpiar
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Guardando..." : (editingId ? "Actualizar plan" : "Crear plan")}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
 
       <div className="space-y-3">
         {loading && <p className="text-sm text-muted-foreground">Cargando planes...</p>}
