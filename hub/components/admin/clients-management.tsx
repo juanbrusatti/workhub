@@ -3,20 +3,87 @@
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { mockClients } from "@/lib/mock-data"
+import { mockClients, mockMembershipPlans } from "@/lib/mock-data"
 import { useState } from "react"
 import { format } from "date-fns"
+import { useAuth } from "@/lib/auth-context"
 
 export default function ClientsManagement() {
   const [clients, setClients] = useState(mockClients)
   const [showAddForm, setShowAddForm] = useState(false)
-  const [newClient, setNewClient] = useState({ name: "", email: "", company: "", plan: "1" })
+  const [newClient, setNewClient] = useState({ name: "", email: "", password: "", company: "", plan: "1" })
+  const [formError, setFormError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { getIdToken } = useAuth()
 
-  const handleAddClient = () => {
-    if (newClient.name && newClient.email && newClient.company) {
-      // Mock add client
+  const handleAddClient = async () => {
+    if (!newClient.name || !newClient.email || !newClient.password) {
+      setFormError("Please complete all required fields")
+      return
+    }
+
+    setFormError(null)
+    setIsSubmitting(true)
+
+    try {
+      const token = await getIdToken()
+      if (!token) {
+        setFormError("Your session expired. Please sign in again.")
+        return
+      }
+
+      const response = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: newClient.email,
+          password: newClient.password,
+          name: newClient.name,
+          companyName: newClient.company,
+          planId: newClient.plan,
+        }),
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok) {
+        setFormError(payload.error || "Failed to create client")
+        return
+      }
+
+      const selectedPlan =
+        mockMembershipPlans.find((plan) => plan.id === newClient.plan) || mockMembershipPlans[0]
+
+      const newClientEntry = {
+        id: payload.id,
+        userId: payload.id,
+        user: {
+          id: payload.id,
+          email: newClient.email,
+          name: newClient.name,
+          role: "client" as const,
+          companyName: newClient.company,
+          createdAt: new Date(),
+        },
+        companyName: newClient.company,
+        plan: selectedPlan,
+        subscriptionStartDate: new Date(),
+        subscriptionEndDate: new Date(),
+        status: "active" as const,
+        createdAt: new Date(),
+      }
+
+      setClients([newClientEntry, ...clients])
       setShowAddForm(false)
-      setNewClient({ name: "", email: "", company: "", plan: "1" })
+      setNewClient({ name: "", email: "", password: "", company: "", plan: "1" })
+    } catch (error) {
+      console.error(error)
+      setFormError("Unexpected error while creating client")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -41,6 +108,16 @@ export default function ClientsManagement() {
                 placeholder="John Doe"
                 value={newClient.name}
                 onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md bg-background"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Password</label>
+              <input
+                type="password"
+                placeholder="Temporary password"
+                value={newClient.password}
+                onChange={(e) => setNewClient({ ...newClient, password: e.target.value })}
                 className="w-full px-3 py-2 border rounded-md bg-background"
               />
             </div>
@@ -77,8 +154,9 @@ export default function ClientsManagement() {
               </select>
             </div>
             <Button onClick={handleAddClient} className="w-full">
-              Create Client
+              {isSubmitting ? "Creating..." : "Create Client"}
             </Button>
+            {formError && <p className="text-sm text-destructive text-center">{formError}</p>}
           </div>
         </Card>
       )}
