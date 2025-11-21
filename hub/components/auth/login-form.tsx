@@ -50,8 +50,8 @@ export default function LoginForm() {
   return (
     <div className="w-full max-w-md">
       <Card className="p-8 border-0 shadow-2xl">
-        <h1 className="text-3xl font-bold text-center mb-2">CoWorkHub</h1>
-        <p className="text-center text-muted-foreground mb-8">Premium coworking space management</p>
+        <h1 className="text-3xl font-bold text-center mb-2">Ramos Generales</h1>
+        <p className="text-center text-muted-foreground mb-8">Gestión de espacios de coworking</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -67,7 +67,7 @@ export default function LoginForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Password</label>
+            <label className="block text-sm font-medium mb-2">Constraseña</label>
             <Input
               type="password"
               placeholder="Enter your password"
@@ -81,12 +81,12 @@ export default function LoginForm() {
           {error && <div className="bg-destructive/10 text-destructive text-sm p-3 rounded">{error}</div>}
 
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Signing in..." : "Sign In"}
+            {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
           </Button>
         </form>
 
         <div className="mt-6 border-t pt-6">
-          <p className="text-sm text-muted-foreground mb-3">Demo Accounts:</p>
+          <p className="text-sm text-muted-foreground mb-3">Cuentas demo:</p>
           <div className="space-y-2">
             <Button
               variant="outline"
@@ -94,7 +94,7 @@ export default function LoginForm() {
               onClick={() => handleDemoLogin("admin@coworkhub.com", "admin123")}
               disabled={isLoading}
             >
-              Admin Demo
+              Admin Ramos
             </Button>
             <Button
               variant="outline"
@@ -102,7 +102,7 @@ export default function LoginForm() {
               onClick={() => handleDemoLogin("alex@company.com", "password123")}
               disabled={isLoading}
             >
-              Client Demo (Alex)
+              Client Ramos (Alex)
             </Button>
             <Button
               variant="outline"
@@ -110,14 +110,14 @@ export default function LoginForm() {
               onClick={() => handleDemoLogin("sarah@design.com", "password123")}
               disabled={isLoading}
             >
-              Client Demo (Sarah)
+              Client Ramos (Sarah)
             </Button>
           </div>
         </div>
       </Card>
 
       <p className="text-center text-xs text-muted-foreground mt-6">
-        This is a demo application. Use the demo accounts to explore.
+        Esta es una demostración de aplicación. Use las cuentas demostración para explorar.
       </p>
     </div>
   )

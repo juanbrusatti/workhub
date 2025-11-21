@@ -125,7 +125,6 @@ export const mockClients: Client[] = [
     user: {
       id: "user2",
       email: "alex@company.com",
-      password: "password123",
       name: "Alex Johnson",
       role: "client",
       companyName: "Tech Startup Inc",
@@ -145,7 +144,6 @@ export const mockClients: Client[] = [
     user: {
       id: "user3",
       email: "sarah@design.com",
-      password: "password123",
       name: "Sarah Design",
       role: "client",
       companyName: "Design Studio",
@@ -164,7 +162,6 @@ export const mockClients: Client[] = [
 export const mockAdminUser: User = {
   id: "admin1",
   email: "admin@coworkhub.com",
-  password: "admin123",
   name: "Admin User",
   role: "admin",
   createdAt: new Date("2024-01-01"),
@@ -173,7 +170,6 @@ export const mockAdminUser: User = {
 export const mockClientUser: User = {
   id: "user2",
   email: "alex@company.com",
-  password: "password123",
   name: "Alex Johnson",
   role: "client",
   companyName: "Tech Startup Inc",

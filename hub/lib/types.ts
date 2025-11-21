@@ -3,12 +3,11 @@ export type UserRole = "admin" | "client"
 export interface User {
   id: string
   email: string
-  password: string
   name: string
   role: UserRole
   companyName?: string
   phone?: string
-  createdAt: Date
+  createdAt?: Date | null
 }
 
 export interface MembershipPlan {

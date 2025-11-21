@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
+    "predev": "tsx scripts/ensure-admin-user.ts",
     "dev": "next dev",
+    "build": "next build",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "set-admin-role": "tsx scripts/set-admin-role.ts",
+    "ensure-admin": "tsx scripts/ensure-admin-user.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -44,6 +47,8 @@
     "cmdk": "1.0.4",
     "date-fns": "latest",
     "embla-carousel-react": "8.5.1",
+    "firebase": "^12.6.0",
+    "firebase-admin": "^13.6.0",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "next": "16.0.3",
@@ -65,8 +70,10 @@
     "@types/node": "^22",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "dotenv": "^16.6.1",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
+    "tsx": "^4.20.6",
     "tw-animate-css": "1.3.3",
     "typescript": "^5"
   }
