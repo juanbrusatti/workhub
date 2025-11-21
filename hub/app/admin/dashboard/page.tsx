@@ -35,11 +35,11 @@ export default function AdminDashboard() {
         {/* Navigation tabs */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2 border-b">
           {[
-            { id: "overview", label: "Overview" },
-            { id: "clients", label: "Clients" },
-            { id: "plans", label: "Membership Plans" },
-            { id: "rooms", label: "Rooms & Desks" },
-            { id: "announcements", label: "Announcements" },
+            { id: "overview", label: "General" },
+            { id: "clients", label: "Clientes" },
+            { id: "plans", label: "Planes de pago" },
+            { id: "rooms", label: "Salas y escritorios" },
+            { id: "announcements", label: "Anuncios" },
           ].map((tab) => (
             <button
               key={tab.id}
