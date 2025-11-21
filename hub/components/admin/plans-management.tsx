@@ -10,7 +10,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown, Plus } from "lucide-react"
+import { ChevronDown, Plus, AlertCircle } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type BillingPeriod = "monthly" | "daily" | "hourly"
 
@@ -50,6 +60,7 @@ export default function PlansManagement() {
   const [formState, setFormState] = useState<PlanFormState>(defaultFormState)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isFormOpen, setIsFormOpen] = useState(false)
 
   const fetchPlans = async () => {
@@ -181,14 +192,18 @@ export default function PlansManagement() {
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const [planToDelete, setPlanToDelete] = useState<string | null>(null)
+
+  const handleDeleteClick = (id: string) => {
+    setPlanToDelete(id)
+    setShowDeleteDialog(true)
+  }
+
+  const handleDelete = async () => {
+    const id = planToDelete
     if (!id) {
       console.error('Error: No se proporcionó un ID de plan válido')
       setError('No se pudo identificar el plan a eliminar')
-      return
-    }
-
-    if (!confirm('¿Estás seguro que deseas eliminar este plan? Esta acción no se puede deshacer.')) {
       return
     }
 
@@ -243,6 +258,31 @@ export default function PlansManagement() {
 
   return (
     <div className="space-y-6">
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <AlertDialogTitle>¿Eliminar plan?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="pt-2">
+              ¿Estás seguro que deseas eliminar este plan? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={async () => {
+                await handleDelete()
+                setShowDeleteDialog(false)
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div>
         <h2 className="text-2xl font-bold mb-2">Planes de membresía</h2>
         <p className="text-sm text-muted-foreground">
@@ -413,7 +453,7 @@ export default function PlansManagement() {
                 <Button
                   variant="destructive"
                   className={cn("flex-1", deletingId === plan.id && "opacity-70")}
-                  onClick={() => handleDelete(plan.id)}
+                  onClick={() => handleDeleteClick(plan.id)}
                   disabled={deletingId === plan.id || saving}
                 >
                   {deletingId === plan.id ? "Eliminando..." : "Eliminar"}
