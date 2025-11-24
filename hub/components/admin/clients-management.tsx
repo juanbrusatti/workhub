@@ -338,6 +338,63 @@ export default function ClientsManagement() {
     }
   }
 
+  const handlePlanChange = async (clientId: string, planId: string) => {
+    if (!clientId || !planId) {
+      console.error("Datos insuficientes para actualizar el plan", { clientId, planId })
+      return
+    }
+
+    const previousClients = [...clients]
+    const newPlan = plans.find((plan) => plan.id === planId) || null
+
+    setClients((prevClients) =>
+      prevClients.map((client) =>
+        client.id === clientId
+          ? {
+              ...client,
+              plan: newPlan,
+              planId,
+            }
+          : client
+      )
+    )
+
+    try {
+      const token = await getIdToken()
+      if (!token) {
+        throw new Error("No se pudo obtener el token de autenticación")
+      }
+
+      const response = await fetch(`/api/admin/clients/${clientId}/plan`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ planId }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.error || "No se pudo actualizar el plan")
+      }
+
+      toast({
+        title: "Plan actualizado",
+        description: "El plan del cliente se actualizó correctamente",
+      })
+    } catch (error) {
+      console.error("Error actualizando plan", error)
+      setClients(previousClients)
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "No se pudo actualizar el plan del cliente",
+        variant: "destructive",
+      })
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -517,6 +574,25 @@ export default function ClientsManagement() {
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                     <option value="suspended">Suspended</option>
+                  </select>
+
+                  <select
+                    value={client.plan?.id ?? client.planId ?? ""}
+                    onChange={(e) => handlePlanChange(client.id, e.target.value)}
+                    className="px-3 py-1 text-sm border rounded-md bg-background"
+                    disabled={!plans.length}
+                  >
+                    {plans.length === 0 ? (
+                      <option value="">
+                        {isLoading ? "Cargando planes..." : "Sin planes disponibles"}
+                      </option>
+                    ) : (
+                      plans.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               </div>
