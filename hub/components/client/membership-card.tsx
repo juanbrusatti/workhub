@@ -25,31 +25,35 @@ export default function MembershipCard({ plan, client }: MembershipCardProps) {
       <div className="mb-6">
         <p className="text-4xl font-bold">
           ${plan.price}
-          <span className="text-lg text-muted-foreground">/month</span>
+          <span className="text-lg text-muted-foreground">
+            /{(plan as any).billing_period === 'monthly' ? 'mes' : (plan as any).billing_period === 'daily' ? 'día' : 'hora'}
+          </span>
         </p>
       </div>
 
       <div className="space-y-3 mb-6">
-        <h4 className="font-semibold">Included Features:</h4>
+        <h4 className="font-semibold">Características incluidas:</h4>
         <ul className="space-y-2">
-          {plan.features.map((feature, i) => (
-            <li key={i} className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
-              {feature}
-            </li>
-          ))}
+          <li className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
+            WiFi libre
+          </li>
+          <li className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
+            Capacidad para {(plan as any).capacity || 1} {(plan as any).capacity === 1 ? 'persona' : 'personas'}
+          </li>
         </ul>
       </div>
 
       {client && (
         <div className="pt-6 border-t space-y-2">
           <div>
-            <p className="text-sm text-muted-foreground">Subscription Active Until</p>
+            <p className="text-sm text-muted-foreground">Suscripción activa hasta</p>
             <p className="font-semibold">{format(client.subscriptionEndDate, "MMM dd, yyyy")}</p>
           </div>
           <Link href="/client/payments">
             <Button variant="outline" className="w-full mt-4 bg-transparent">
-              View Billing Details
+              Ver detalles de facturación
             </Button>
           </Link>
         </div>
