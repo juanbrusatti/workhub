@@ -57,8 +57,29 @@ export default function ClientsManagement() {
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(4)
   const { getIdToken } = useAuth()
   const { toast } = useToast()
+
+  useEffect(() => {
+    const updateItemsPerPage = () => {
+      const width = window.innerWidth
+      setItemsPerPage(width < 768 ? 4 : 6)
+    }
+
+    updateItemsPerPage()
+    window.addEventListener("resize", updateItemsPerPage)
+
+    return () => window.removeEventListener("resize", updateItemsPerPage)
+  }, [])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(clients.length / itemsPerPage))
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [clients.length, itemsPerPage, currentPage])
 
   const fetchClients = async () => {
     try {
@@ -395,6 +416,10 @@ export default function ClientsManagement() {
     }
   }
 
+  const totalPages = Math.max(1, Math.ceil(clients.length / itemsPerPage))
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedClients = clients.slice(startIndex, startIndex + itemsPerPage)
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -549,56 +574,84 @@ export default function ClientsManagement() {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {clients.map((client) => (
-            <Card key={client.id} className="p-6 border">
-              <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
-                <div>
-                  <h3 className="text-lg font-bold">{client.user.name}</h3>
-                  <p className="text-sm text-muted-foreground">{client.user.email}</p>
-                  <p className="text-sm font-medium mt-1">{client.companyName}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Joined {format(client.createdAt, "MMM dd, yyyy")}</p>
-                </div>
-
-                <div className="flex flex-col items-start md:items-end gap-3">
-                  <div className="flex gap-2 items-center">
-                    <Badge className="bg-primary">{client.plan?.name ?? "Sin plan"}</Badge>
-                    <Badge variant={client.status === "active" ? "default" : "secondary"}>{client.status}</Badge>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedClients.map((client) => (
+              <Card key={client.id} className="p-6 border">
+                <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                  <div>
+                    <h3 className="text-lg font-bold">{client.user.name}</h3>
+                    <p className="text-sm text-muted-foreground">{client.user.email}</p>
+                    <p className="text-sm font-medium mt-1">{client.companyName}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Unido {format(client.createdAt, "MMM dd, yyyy")}</p>
                   </div>
 
-                  <select
-                    value={client.status}
-                    onChange={(e) => handleStatusChange(client.id, e.target.value as any)}
-                    className="px-3 py-1 text-sm border rounded-md bg-background"
-                  >
-                    <option value="active">Activo</option>
-                    <option value="inactive">Inactivo</option>
-                    <option value="suspended">Suspendido</option>
-                  </select>
+                  <div className="flex flex-col items-start md:items-end gap-3">
+                    <div className="flex gap-2 items-center">
+                      <Badge className="bg-primary">{client.plan?.name ?? "Sin plan"}</Badge>
+                      <Badge variant={client.status === "active" ? "default" : "secondary"}>{client.status}</Badge>
+                    </div>
 
-                  <select
-                    value={client.plan?.id ?? client.planId ?? ""}
-                    onChange={(e) => handlePlanChange(client.id, e.target.value)}
-                    className="px-3 py-1 text-sm border rounded-md bg-background"
-                    disabled={!plans.length}
-                  >
-                    {plans.length === 0 ? (
-                      <option value="">
-                        {isLoading ? "Cargando planes..." : "Sin planes disponibles"}
-                      </option>
-                    ) : (
-                      plans.map((plan) => (
-                        <option key={plan.id} value={plan.id}>
-                          {plan.name}
+                    <select
+                      value={client.status}
+                      onChange={(e) => handleStatusChange(client.id, e.target.value as any)}
+                      className="px-3 py-1 text-sm border rounded-md bg-background"
+                    >
+                      <option value="active">Activo</option>
+                      <option value="inactive">Inactivo</option>
+                      <option value="suspended">Suspendido</option>
+                    </select>
+
+                    <select
+                      value={client.plan?.id ?? client.planId ?? ""}
+                      onChange={(e) => handlePlanChange(client.id, e.target.value)}
+                      className="px-3 py-1 text-sm border rounded-md bg-background"
+                      disabled={!plans.length}
+                    >
+                      {plans.length === 0 ? (
+                        <option value="">
+                          {isLoading ? "Cargando planes..." : "Sin planes disponibles"}
                         </option>
-                      ))
-                    )}
-                  </select>
+                      ) : (
+                        plans.map((plan) => (
+                          <option key={plan.id} value={plan.id}>
+                            {plan.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
                 </div>
+              </Card>
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex flex-col items-center gap-3 pt-4 md:flex-row md:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Siguiente
+                </Button>
               </div>
-            </Card>
-          ))}
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
