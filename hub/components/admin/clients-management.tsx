@@ -571,9 +571,9 @@ export default function ClientsManagement() {
                     onChange={(e) => handleStatusChange(client.id, e.target.value as any)}
                     className="px-3 py-1 text-sm border rounded-md bg-background"
                   >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
+                    <option value="active">Activo</option>
+                    <option value="inactive">Inactivo</option>
+                    <option value="suspended">Suspendido</option>
                   </select>
 
                   <select
