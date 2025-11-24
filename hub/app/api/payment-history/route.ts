@@ -20,18 +20,14 @@ export async function GET(request: Request) {
     const uid = decodedToken.uid
     console.log('Token verified for user:', uid)
 
-    // Obtener el historial de pagos del usuario (sin ordenar para evitar índice)
-    console.log('Fetching payment history for user:', uid)
+    // Obtener el historial de pagos del usuario
     const snapshot = await adminDb
       .collection("payment_history")
       .where("userId", "==", uid)
       .get()
 
-    console.log('Payment history fetched, docs count:', snapshot.docs.length)
-
     const payments = snapshot.docs.map(doc => {
       const data = doc.data()
-      console.log('Payment doc data:', data)
       return {
         id: doc.id,
         period: data.period,
@@ -49,9 +45,13 @@ export async function GET(request: Request) {
       return dateB - dateA // Descendente
     })
 
-    console.log('Final payments array:', payments)
-
-    return NextResponse.json({ payments })
+    return NextResponse.json({ payments }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
 
   } catch (error) {
     console.error("Error fetching payment history:", error)

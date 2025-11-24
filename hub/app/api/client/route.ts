@@ -32,20 +32,14 @@ export async function GET(request: Request) {
 
     const clientData = clientDoc.data()
     if (!clientData) {
-      console.log('Client data is null/undefined')
       return NextResponse.json({ error: "Client data not found" }, { status: 404 })
     }
     
-    console.log('Client data:', clientData)
-    
     // Obtener datos del usuario
-    console.log('Fetching user data...')
     const userDoc = await adminDb.collection("users").doc(uid).get()
     const userData = userDoc.exists ? userDoc.data() : null
-    console.log('User data:', userData)
 
     // Obtener los planes de Supabase
-    console.log('Fetching membership plans from Supabase...')
     const supabase = getSupabaseAdminClient()
     const { data: plansData, error: plansError } = await supabase
       .from("membership_plans")
@@ -53,22 +47,18 @@ export async function GET(request: Request) {
     
     if (plansError) {
       console.error("Failed to fetch membership plans", plansError)
-    } else {
-      console.log('Plans fetched:', plansData?.length || 0, 'plans')
+      return NextResponse.json({ error: "Failed to fetch plans" }, { status: 500 })
     }
-
-    // Obtener el plan del cliente si tiene uno asignado
-    let planData = null
-    console.log('Client planId:', clientData.planId)
     
-    if (clientData.planId && plansData) {
-      planData = plansData.find(plan => plan.id === clientData.planId)
-      console.log('Found plan data:', planData)
+    const plans = plansData || []
+    let planData = null
+    
+    if (clientData.planId) {
+      planData = plans.find(plan => plan.id === clientData.planId) || null
     }
 
     // Si no tiene plan, asignar un plan por defecto
     if (!planData) {
-      console.log('No plan found, assigning free plan')
       planData = {
         id: "free",
         name: "Plan Gratuito",
@@ -94,7 +84,13 @@ export async function GET(request: Request) {
     }
 
     console.log('Final response:', response)
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
   } catch (error) {
     console.error("Error fetching client data:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

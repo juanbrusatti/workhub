@@ -75,33 +75,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    // Obtener todas las solicitudes de pago pendientes (sin ordenar para evitar índice)
-    console.log('Attempting to fetch payment requests...')
-    console.log('Current time:', new Date().toISOString())
-    
+    // Obtener todas las solicitudes de pago pendientes
     const snapshot = await adminDb
       .collection("payment_requests")
       .where("status", "==", "pending")
       .get()
 
-    console.log('Fetched snapshot, docs count:', snapshot.docs.length)
-    
-    // Log detallado de cada documento
-    snapshot.docs.forEach((doc, index) => {
-      const data = doc.data()
-      console.log(`Document ${index + 1}:`, {
-        id: doc.id,
-        status: data.status,
-        userName: data.userName,
-        userEmail: data.userEmail,
-        requestDate: data.requestDate,
-        processedAt: data.processedAt
-      })
-    })
-    
     const requests = snapshot.docs.map(doc => {
       const data = doc.data() as PaymentRequestData
-      console.log('Document data:', data)
       return {
         id: doc.id,
         ...data
@@ -115,9 +96,13 @@ export async function GET(request: Request) {
       return dateB - dateA // Descendente
     })
 
-    console.log('Final requests array:', requests)
-
-    return NextResponse.json({ requests })
+    return NextResponse.json({ requests }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
 
   } catch (error) {
     console.error("Error fetching payment requests:", error)
