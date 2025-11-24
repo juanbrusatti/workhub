@@ -25,6 +25,9 @@ export default function AdminNav({ user, onLogout }: AdminNavProps) {
             <Link href="/admin/dashboard" className="text-sm hover:text-primary">
               Dashboard
             </Link>
+            <Link href="/admin/payment-requests" className="text-sm hover:text-primary">
+              Solicitudes de Pago
+            </Link>
             <Link href="/admin/payments" className="text-sm hover:text-primary">
               Payments
             </Link>
