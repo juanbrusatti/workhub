@@ -30,6 +30,7 @@ export default function PaymentRequestsPage() {
   const [requests, setRequests] = useState<PaymentRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   useEffect(() => {
     fetchPaymentRequests()
@@ -94,10 +95,31 @@ export default function PaymentRequestsPage() {
       // Actualizar la lista de solicitudes
       setRequests(requests.filter(req => req.id !== requestId))
       
-      alert(action === 'approve' ? 'Pago aprobado correctamente' : 'Solicitud rechazada')
+      // Mostrar mensaje de éxito
+      if (action === 'approve') {
+        setMessage({
+          type: 'success',
+          text: 'Pago aprobado correctamente'
+        })
+      } else {
+        setMessage({
+          type: 'success',
+          text: 'Solicitud rechazada'
+        })
+      }
+      
+      // Ocultar mensaje después de 3 segundos
+      setTimeout(() => setMessage(null), 3000)
+      
     } catch (error) {
       console.error('Error:', error)
-      alert('Error al procesar la solicitud')
+      setMessage({
+        type: 'error',
+        text: 'Error al procesar la solicitud'
+      })
+      
+      // Ocultar mensaje después de 3 segundos
+      setTimeout(() => setMessage(null), 3000)
     }
   }
 
@@ -140,6 +162,17 @@ export default function PaymentRequestsPage() {
   return (
     <div className="min-h-screen bg-background">
       <AdminNav user={user} onLogout={handleLogout} />
+      
+      {/* Mensaje de éxito/error */}
+      {message && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
+          message.type === 'success' 
+            ? 'bg-green-100 border border-green-400 text-green-700' 
+            : 'bg-red-100 border border-red-400 text-red-700'
+        }`}>
+          <p className="font-medium">{message.text}</p>
+        </div>
+      )}
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="mb-8">
