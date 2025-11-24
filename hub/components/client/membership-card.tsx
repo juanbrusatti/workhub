@@ -24,7 +24,7 @@ export default function MembershipCard({ plan, client }: MembershipCardProps) {
 
       <div className="mb-6">
         <p className="text-4xl font-bold">
-          ${plan.price}
+          ${(plan as any).price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
           <span className="text-lg text-muted-foreground">
             /{(plan as any).billing_period === 'monthly' ? 'mes' : (plan as any).billing_period === 'daily' ? 'día' : 'hora'}
           </span>
