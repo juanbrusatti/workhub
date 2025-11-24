@@ -11,29 +11,42 @@ import { Loader2, Plus, Users } from "lucide-react"
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { useAuth } from "@/lib/auth-context"
-import type { MembershipPlan } from "@/lib/types"
+
+type AdminPlan = {
+  id: string
+  name: string
+  price: number
+  billing_period?: string | null
+  billingPeriod?: string | null
+  capacity?: number | null
+  description?: string | null
+  created_at?: string | null
+}
+
+type AdminClient = {
+  id: string
+  userId: string
+  user: {
+    id: string
+    email: string
+    name: string
+    role: string
+    companyName: string
+    createdAt: Date
+  }
+  companyName: string
+  planId?: string | null
+  plan: AdminPlan | null
+  subscriptionStartDate: Date
+  subscriptionEndDate: Date | null
+  status: "active" | "inactive" | "suspended"
+  createdAt: Date
+}
 
 export default function ClientsManagement() {
-  const [clients, setClients] = useState<Array<{
-    id: string
-    userId: string
-    user: {
-      id: string
-      email: string
-      name: string
-      role: string
-      companyName: string
-      createdAt: Date
-    }
-    companyName: string
-    plan: MembershipPlan
-    subscriptionStartDate: Date
-    subscriptionEndDate: Date
-    status: 'active' | 'inactive' | 'suspended'
-    createdAt: Date
-  }>>([])
-  
-  const [plans, setPlans] = useState<MembershipPlan[]>([])
+  const [clients, setClients] = useState<AdminClient[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [plans, setPlans] = useState<AdminPlan[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [newClient, setNewClient] = useState({ 
     name: "", 
@@ -44,13 +57,79 @@ export default function ClientsManagement() {
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const { getIdToken } = useAuth()
   const { toast } = useToast()
+
+  const fetchClients = async () => {
+    try {
+      const token = await getIdToken()
+      if (!token) return
+
+      const response = await fetch("/api/admin/clients", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.error || "No se pudieron cargar los clientes")
+      }
+
+      const payload = await response.json()
+      const fetchedClients = Array.isArray(payload?.clients) ? payload.clients : []
+
+      setClients(
+        fetchedClients.map((client) => {
+          const planData = client.plan
+          const normalizedPlan: AdminPlan | null = planData
+            ? {
+                id: planData.id,
+                name: planData.name,
+                price: typeof planData.price === "number" ? planData.price : Number(planData.price) || 0,
+                billing_period: planData.billing_period ?? planData.billingPeriod ?? null,
+                billingPeriod: planData.billingPeriod ?? planData.billing_period ?? null,
+                capacity: planData.capacity ?? null,
+                description: planData.description ?? null,
+                created_at: planData.created_at ?? null,
+              }
+            : null
+
+          return {
+            id: client.id,
+            userId: client.userId,
+            user: {
+              ...client.user,
+              createdAt: client.user?.createdAt ? new Date(client.user.createdAt) : new Date(),
+            },
+            companyName: client.companyName ?? "",
+            planId: client.planId ?? client.plan?.id ?? null,
+            plan: normalizedPlan,
+            subscriptionStartDate: client.subscriptionStartDate
+              ? new Date(client.subscriptionStartDate)
+              : client.createdAt
+              ? new Date(client.createdAt)
+              : new Date(),
+            subscriptionEndDate: client.subscriptionEndDate ? new Date(client.subscriptionEndDate) : null,
+            status: client.status,
+            createdAt: client.createdAt ? new Date(client.createdAt) : new Date(),
+          }
+        })
+      )
+    } catch (error) {
+      console.error("Error fetching clients", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los clientes",
+        variant: "destructive",
+      })
+    }
+  }
 
   // Cargar planes de pago al montar el componente
   useEffect(() => {
     const fetchPlans = async () => {
+      setIsLoading(true)
       try {
         const token = await getIdToken()
         if (!token) return
@@ -83,6 +162,8 @@ export default function ClientsManagement() {
           } else {
             setNewClient(prev => ({ ...prev, plan: "" }))
           }
+
+          await fetchClients()
         } else {
           throw new Error('Error al cargar los planes de pago')
         }
@@ -158,6 +239,7 @@ export default function ClientsManagement() {
       if (!selectedPlan) {
         throw new Error('No se pudo encontrar el plan seleccionado')
       }
+      
 
       const newClientEntry = {
         id: payload.uid || payload.id,
@@ -201,8 +283,116 @@ export default function ClientsManagement() {
     }
   }
 
-  const handleStatusChange = (clientId: string, newStatus: "active" | "inactive" | "suspended") => {
-    setClients(clients.map((c) => (c.id === clientId ? { ...c, status: newStatus } : c)))
+  const handleStatusChange = async (clientId: string, newStatus: "active" | "inactive" | "suspended") => {
+    if (!clientId) {
+      console.error('ID de cliente no proporcionado')
+      return
+    }
+
+    // Guardar el estado anterior para poder revertir en caso de error
+    const previousClients = [...clients]
+    
+    // Actualizar el estado local inmediatamente para mejor experiencia de usuario
+    setClients(prevClients => 
+      prevClients.map(c => 
+        c.id === clientId ? { ...c, status: newStatus } : c
+      )
+    )
+
+    try {
+      const token = await getIdToken()
+      if (!token) {
+        throw new Error('No se pudo obtener el token de autenticación')
+      }
+
+      const response = await fetch(`/api/admin/clients/${clientId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Error al actualizar el estado')
+      }
+
+      await fetchClients()
+
+      toast({
+        title: '¡Listo!',
+        description: 'Estado actualizado correctamente',
+      })
+    } catch (error) {
+      console.error('Error actualizando estado:', error)
+      // Revertir al estado anterior en caso de error
+      setClients(previousClients)
+      
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Error al actualizar el estado',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handlePlanChange = async (clientId: string, planId: string) => {
+    if (!clientId || !planId) {
+      console.error("Datos insuficientes para actualizar el plan", { clientId, planId })
+      return
+    }
+
+    const previousClients = [...clients]
+    const newPlan = plans.find((plan) => plan.id === planId) || null
+
+    setClients((prevClients) =>
+      prevClients.map((client) =>
+        client.id === clientId
+          ? {
+              ...client,
+              plan: newPlan,
+              planId,
+            }
+          : client
+      )
+    )
+
+    try {
+      const token = await getIdToken()
+      if (!token) {
+        throw new Error("No se pudo obtener el token de autenticación")
+      }
+
+      const response = await fetch(`/api/admin/clients/${clientId}/plan`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ planId }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.error || "No se pudo actualizar el plan")
+      }
+
+      toast({
+        title: "Plan actualizado",
+        description: "El plan del cliente se actualizó correctamente",
+      })
+    } catch (error) {
+      console.error("Error actualizando plan", error)
+      setClients(previousClients)
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "No se pudo actualizar el plan del cliente",
+        variant: "destructive",
+      })
+    }
   }
 
   if (isLoading) {
@@ -372,7 +562,7 @@ export default function ClientsManagement() {
 
                 <div className="flex flex-col items-start md:items-end gap-3">
                   <div className="flex gap-2 items-center">
-                    <Badge className="bg-primary">{client.plan.name}</Badge>
+                    <Badge className="bg-primary">{client.plan?.name ?? "Sin plan"}</Badge>
                     <Badge variant={client.status === "active" ? "default" : "secondary"}>{client.status}</Badge>
                   </div>
 
@@ -381,9 +571,28 @@ export default function ClientsManagement() {
                     onChange={(e) => handleStatusChange(client.id, e.target.value as any)}
                     className="px-3 py-1 text-sm border rounded-md bg-background"
                   >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
+                    <option value="active">Activo</option>
+                    <option value="inactive">Inactivo</option>
+                    <option value="suspended">Suspendido</option>
+                  </select>
+
+                  <select
+                    value={client.plan?.id ?? client.planId ?? ""}
+                    onChange={(e) => handlePlanChange(client.id, e.target.value)}
+                    className="px-3 py-1 text-sm border rounded-md bg-background"
+                    disabled={!plans.length}
+                  >
+                    {plans.length === 0 ? (
+                      <option value="">
+                        {isLoading ? "Cargando planes..." : "Sin planes disponibles"}
+                      </option>
+                    ) : (
+                      plans.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               </div>
