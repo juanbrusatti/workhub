@@ -48,8 +48,22 @@ export default function MembershipCard({ plan, client }: MembershipCardProps) {
       {client && (
         <div className="pt-6 border-t space-y-2">
           <div>
-            <p className="text-sm text-muted-foreground">Suscripción activa hasta</p>
-            <p className="font-semibold">{format(client.subscriptionEndDate, "MMM dd, yyyy")}</p>
+            <p className="text-sm text-muted-foreground">
+              {(plan as any).billing_period === 'monthly' 
+                ? 'Período de pago' 
+                : (plan as any).billing_period === 'daily' 
+                  ? 'Período de renovación' 
+                  : 'Período de uso'
+              }
+            </p>
+            <p className="font-semibold">
+              {(plan as any).billing_period === 'monthly' 
+                ? 'Del 1 al 10 de cada mes' 
+                : (plan as any).billing_period === 'daily' 
+                  ? 'Se renueva cada día' 
+                  : 'Se renueva cada hora'
+              }
+            </p>
           </div>
           <Link href="/client/payments">
             <Button variant="outline" className="w-full mt-4 bg-transparent">
