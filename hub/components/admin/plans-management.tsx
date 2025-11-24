@@ -62,6 +62,8 @@ export default function PlansManagement() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [planPage, setPlanPage] = useState(1)
+  const [plansPerPage, setPlansPerPage] = useState(4)
 
   const fetchPlans = async () => {
     setLoading(true)
@@ -94,6 +96,25 @@ export default function PlansManagement() {
     fetchPlans()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const updatePlansPerPage = () => {
+      const width = window.innerWidth
+      setPlansPerPage(width < 1024 ? 4 : 3)
+    }
+
+    updatePlansPerPage()
+    window.addEventListener("resize", updatePlansPerPage)
+
+    return () => window.removeEventListener("resize", updatePlansPerPage)
+  }, [])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(plans.length / plansPerPage))
+    if (planPage > totalPages) {
+      setPlanPage(totalPages)
+    }
+  }, [plans.length, plansPerPage, planPage])
 
   const handleInputChange = (field: keyof PlanFormState, value: string) => {
     setFormState((prev) => ({ ...prev, [field]: value }))
@@ -255,6 +276,10 @@ export default function PlansManagement() {
       setDeletingId(null)
     }
   }
+
+  const totalPlanPages = Math.max(1, Math.ceil(plans.length / plansPerPage))
+  const startPlanIndex = (planPage - 1) * plansPerPage
+  const paginatedPlans = plans.slice(startPlanIndex, startPlanIndex + plansPerPage)
 
   return (
     <div className="space-y-6">
@@ -423,45 +448,73 @@ export default function PlansManagement() {
           <p className="text-sm text-muted-foreground">Aún no hay planes registrados.</p>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          {plans.map((plan) => (
-            <Card key={plan.id} className="p-5 border space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-lg font-bold">{plan.name}</h4>
-                  <p className="text-sm text-muted-foreground">{plan.description || "Sin descripción"}</p>
+        <>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {paginatedPlans.map((plan) => (
+              <Card key={plan.id} className="p-5 border space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-lg font-bold">{plan.name}</h4>
+                    <p className="text-sm text-muted-foreground">{plan.description || "Sin descripción"}</p>
+                  </div>
+                  <span className="text-sm font-semibold">{new Date(plan.created_at).toLocaleDateString()}</span>
                 </div>
-                <span className="text-sm font-semibold">{new Date(plan.created_at).toLocaleDateString()}</span>
-              </div>
 
-              <div className="space-y-1 text-sm">
-                <p>
-                  <strong>Precio:</strong> ${plan.price.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
-                </p>
-                <p>
-                  <strong>Tipo:</strong> {plan.billing_period === "monthly" ? "Mensual" : plan.billing_period === "daily" ? "Por día" : "Por hora"}
-                </p>
-                <p>
-                  <strong>Capacidad:</strong> {plan.capacity} {plan.capacity === 1 ? "persona" : "personas"}
-                </p>
-              </div>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    <strong>Precio:</strong> ${plan.price.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  </p>
+                  <p>
+                    <strong>Tipo:</strong> {plan.billing_period === "monthly" ? "Mensual" : plan.billing_period === "daily" ? "Por día" : "Por hora"}
+                  </p>
+                  <p>
+                    <strong>Capacidad:</strong> {plan.capacity} {plan.capacity === 1 ? "persona" : "personas"}
+                  </p>
+                </div>
 
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => startEdit(plan)} disabled={saving || deletingId === plan.id}>
+                    Editar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className={cn("flex-1", deletingId === plan.id && "opacity-70")}
+                    onClick={() => handleDeleteClick(plan.id)}
+                    disabled={deletingId === plan.id || saving}
+                  >
+                    {deletingId === plan.id ? "Eliminando..." : "Eliminar"}
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {totalPlanPages > 1 && (
+            <div className="flex flex-col items-center gap-3 pt-4 md:flex-row md:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Página {planPage} de {totalPlanPages}
+              </p>
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => startEdit(plan)} disabled={saving || deletingId === plan.id}>
-                  Editar
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPlanPage((prev) => Math.max(1, prev - 1))}
+                  disabled={planPage === 1}
+                >
+                  Anterior
                 </Button>
                 <Button
-                  variant="destructive"
-                  className={cn("flex-1", deletingId === plan.id && "opacity-70")}
-                  onClick={() => handleDeleteClick(plan.id)}
-                  disabled={deletingId === plan.id || saving}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPlanPage((prev) => Math.min(totalPlanPages, prev + 1))}
+                  disabled={planPage === totalPlanPages}
                 >
-                  {deletingId === plan.id ? "Eliminando..." : "Eliminar"}
+                  Siguiente
                 </Button>
               </div>
-            </Card>
-          ))}
-        </div>
+            </div>
+          )}
+        </>
       </div>
     </div>
   )
