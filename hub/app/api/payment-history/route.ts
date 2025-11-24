@@ -38,7 +38,6 @@ export async function GET(request: Request) {
         amount: data.amount,
         status: data.status,
         paymentDate: data.paymentDate,
-        transactionId: data.transactionId,
         planName: data.planName
       }
     })

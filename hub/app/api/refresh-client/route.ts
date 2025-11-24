@@ -4,8 +4,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase"
 
 const unauthorizedResponse = NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-export async function GET(request: Request) {
-  console.log('GET /api/client - Starting request')
+export async function POST(request: Request) {
+  console.log('POST /api/refresh-client - Starting request')
   
   const authHeader = request.headers.get("authorization")
   if (!authHeader?.startsWith("Bearer ")) {
@@ -21,8 +21,8 @@ export async function GET(request: Request) {
     const uid = decodedToken.uid
     console.log('Token verified for user:', uid)
 
-    // Obtener datos del cliente desde Firestore
-    console.log('Fetching client data for uid:', uid)
+    // Obtener datos actualizados del cliente desde Firestore
+    console.log('Fetching fresh client data for uid:', uid)
     const clientDoc = await adminDb.collection("clients").doc(uid).get()
     
     if (!clientDoc.exists) {
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Client data not found" }, { status: 404 })
     }
     
-    console.log('Client data:', clientData)
+    console.log('Fresh client data:', clientData)
     
     // Obtener datos del usuario
     console.log('Fetching user data...')
@@ -90,13 +90,17 @@ export async function GET(request: Request) {
       plan: planData,
       createdAt: clientData.createdAt,
       email: userData?.email || "",
-      name: userData?.name || ""
+      name: userData?.name || "",
+      nextPaymentPeriod: clientData.nextPaymentPeriod,
+      paymentStatus: clientData.paymentStatus,
+      currentPeriod: clientData.currentPeriod,
+      lastPaymentDate: clientData.lastPaymentDate
     }
 
-    console.log('Final response:', response)
+    console.log('Refresh response:', response)
     return NextResponse.json(response)
   } catch (error) {
-    console.error("Error fetching client data:", error)
+    console.error("Error refreshing client data:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

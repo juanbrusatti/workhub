@@ -98,6 +98,61 @@ export async function PATCH(
         requestId: id
       })
 
+      // Actualizar el próximo período de pago del cliente
+      const clientRef = adminDb.collection("clients").doc(requestData.clientId)
+      const clientDoc = await clientRef.get()
+      
+      if (clientDoc.exists) {
+        const clientData = clientDoc.data()
+        if (!clientData) {
+          console.log('Client data is null/undefined')
+          return NextResponse.json({ error: "Datos del cliente no encontrados" }, { status: 404 })
+        }
+        
+        const currentPeriod = clientData.currentPeriod || 1
+        
+        // Calcular el siguiente período
+        const nextPeriod = currentPeriod + 1
+        const nextMonthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+        
+        // Obtener el mes actual basado en el currentPeriod del cliente
+        // Si currentPeriod es 1, es el primer mes del cliente; si es 2, el segundo, etc.
+        const currentDate = new Date()
+        let clientStartMonth = currentDate.getMonth() // Mes actual como referencia
+        let clientStartYear = currentDate.getFullYear()
+        
+        // Calcular el mes de inicio del cliente restando (currentPeriod - 1) meses
+        clientStartMonth = (clientStartMonth - (currentPeriod - 1) + 12) % 12
+        clientStartYear = clientStartYear - Math.floor((currentDate.getMonth() - (currentPeriod - 1)) / 12)
+        
+        // El siguiente período es el mes siguiente al período actual del cliente
+        const nextMonth = (clientStartMonth + currentPeriod) % 12
+        const nextYear = clientStartYear + Math.floor((clientStartMonth + currentPeriod) / 12)
+        
+        console.log('Calculation details:', {
+          currentPeriod,
+          clientStartMonth,
+          clientStartYear,
+          nextMonth,
+          nextYear
+        })
+        
+        await clientRef.update({
+          currentPeriod: nextPeriod,
+          lastPaymentDate: new Date(),
+          nextPaymentPeriod: `${nextMonthNames[nextMonth]} ${nextYear}`,
+          paymentStatus: 'active'
+        })
+        
+        console.log('Updated client next payment period to:', `${nextMonthNames[nextMonth]} ${nextYear}`)
+        console.log('Client data after update:', {
+          currentPeriod: nextPeriod,
+          nextPaymentPeriod: `${nextMonthNames[nextMonth]} ${nextYear}`,
+          paymentStatus: 'active'
+        })
+      }
+
       return NextResponse.json({ 
         success: true, 
         message: "Pago aprobado correctamente" 

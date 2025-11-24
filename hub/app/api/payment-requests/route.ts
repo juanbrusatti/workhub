@@ -77,12 +77,28 @@ export async function GET(request: Request) {
 
     // Obtener todas las solicitudes de pago pendientes (sin ordenar para evitar índice)
     console.log('Attempting to fetch payment requests...')
+    console.log('Current time:', new Date().toISOString())
+    
     const snapshot = await adminDb
       .collection("payment_requests")
       .where("status", "==", "pending")
       .get()
 
     console.log('Fetched snapshot, docs count:', snapshot.docs.length)
+    
+    // Log detallado de cada documento
+    snapshot.docs.forEach((doc, index) => {
+      const data = doc.data()
+      console.log(`Document ${index + 1}:`, {
+        id: doc.id,
+        status: data.status,
+        userName: data.userName,
+        userEmail: data.userEmail,
+        requestDate: data.requestDate,
+        processedAt: data.processedAt
+      })
+    })
+    
     const requests = snapshot.docs.map(doc => {
       const data = doc.data() as PaymentRequestData
       console.log('Document data:', data)

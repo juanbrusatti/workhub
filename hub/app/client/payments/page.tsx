@@ -45,14 +45,15 @@ function PaymentsPage() {
     return {
       period: `${monthNames[nextMonth]} ${nextYear}`,
       dueDate: `10 de ${monthNames[nextMonth]} de ${nextYear}`,
-      isOverdue: currentDay > 10
+      isOverdue: false // Por defecto no está vencido hasta que se carguen los datos reales
     }
   }
-  
+
   const nextPayment = getNextPaymentPeriod()
   // Historial de pagos dinámico
   const [paymentHistory, setPaymentHistory] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(true)
+  const [nextPaymentInfo, setNextPaymentInfo] = useState(nextPayment)
 
   useEffect(() => {
     // Obtener datos del cliente
@@ -74,56 +75,186 @@ function PaymentsPage() {
         }
         
         const data = await response.json()
-        setClientData(data.client)
+        console.log('Client data received:', data)
+        setClientData(data)
+        
+        // Actualizar el próximo período de pago desde los datos del cliente
+        if (data && data.nextPaymentPeriod) {
+          console.log('Updating nextPaymentInfo with:', data.nextPaymentPeriod)
+          setNextPaymentInfo({
+            period: data.nextPaymentPeriod,
+            dueDate: `10 de ${data.nextPaymentPeriod}`,
+            isOverdue: false // Si tiene nextPaymentPeriod asignado, no está vencido
+          })
+        } else {
+          console.log('No nextPaymentPeriod found in data:', data)
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
         console.error('Error:', err)
         setError(errorMessage)
       } finally {
         setLoading(false)
-      }
+        
+        // Cargar historial de pagos
+        try {
+          const historyResponse = await fetch("/api/payment-history", {
+            headers: {
+              "Authorization": `Bearer ${await getIdToken()}`
+            }
+          })
+          
+          if (historyResponse.ok) {
+            const historyData = await historyResponse.json()
+            setPaymentHistory(historyData.payments || [])
+          }
+        } catch (historyErr) {
+          console.error("Error loading payment history:", historyErr)
+        } finally {
+          setLoadingHistory(false)
+        }      }
     }
 
-    // Obtener historial de pagos
-    const fetchPaymentHistory = async () => {
+    if (user) {
+      fetchClientData()
+    }
+  }, [user, getIdToken])
+
+  // Auto-refresco cada 30 segundos para actualizar próximo período
+  useEffect(() => {
+    if (!user) return
+
+    const interval = setInterval(async () => {
+      await refreshClientData()
+    }, 30000) // 30 segundos
+
+    return () => clearInterval(interval)
+  }, [user, getIdToken])
+
+  const refreshClientData = async () => {
+    try {
+      const token = await getIdToken()
+      if (!token) {
+        throw new Error('No se pudo obtener el token de autenticación')
+      }
+      
+      console.log('Refreshing client data...')
+      const response = await fetch('/api/refresh-client', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Error al refrescar los datos del cliente')
+      }
+      
+      const data = await response.json()
+      console.log('Refreshed client data:', data)
+        console.log('nextPaymentPeriod from server:', data.nextPaymentPeriod)
+      setClientData(data)
+      
+      // Actualizar el próximo período de pago desde los datos del cliente
+      if (data && data.nextPaymentPeriod) {
+        setNextPaymentInfo({
+          period: data.nextPaymentPeriod,
+          dueDate: `10 de ${data.nextPaymentPeriod}`,
+          isOverdue: data.paymentStatus !== 'active'
+        })
+      }
+      
+      // También refrescar el historial de pagos
+      const historyResponse = await fetch('/api/payment-history', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (historyResponse.ok) {
+        const historyData = await historyResponse.json()
+        setPaymentHistory(historyData.payments || [])
+        setLoadingHistory(false)      }
+      
+    } catch (err) {
+      console.error('Error al refrescar datos:', err)
+    }
+  }
+
+  useEffect(() => {
+    // Obtener datos del cliente
+    const fetchClientData = async () => {
       try {
         const token = await getIdToken()
         if (!token) {
           throw new Error('No se pudo obtener el token de autenticación')
         }
         
-        console.log('Fetching payment history...')
-        const response = await fetch('/api/payment-history', {
+        const response = await fetch('/api/client', {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         })
         
-        console.log('Payment history response status:', response.status)
-        console.log('Payment history response ok:', response.ok)
-        
         if (!response.ok) {
-          const errorData = await response.json()
-          console.error('Payment history error response:', errorData)
-          throw new Error(errorData.error || 'Error al cargar el historial de pagos')
+          throw new Error('Error al cargar los datos del cliente')
         }
         
         const data = await response.json()
-        console.log('Payment history data:', data)
-        setPaymentHistory(data.payments || [])
+        console.log('Client data received:', data)
+        setClientData(data)
+        
+        // Actualizar el próximo período de pago desde los datos del cliente
+        if (data && data.nextPaymentPeriod) {
+          console.log('Updating nextPaymentInfo with:', data.nextPaymentPeriod)
+          setNextPaymentInfo({
+            period: data.nextPaymentPeriod,
+            dueDate: `10 de ${data.nextPaymentPeriod}`,
+            isOverdue: false // Si tiene nextPaymentPeriod asignado, no está vencido
+          })
+        } else {
+          console.log('No nextPaymentPeriod found in data:', data)
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-        console.error('Error al cargar historial:', err)
+        console.error('Error:', err)
         setError(errorMessage)
       } finally {
-        setLoadingHistory(false)
-      }
+        setLoading(false)
+        
+        // Cargar historial de pagos
+        try {
+          const historyResponse = await fetch("/api/payment-history", {
+            headers: {
+              "Authorization": `Bearer ${await getIdToken()}`
+            }
+          })
+          
+          if (historyResponse.ok) {
+            const historyData = await historyResponse.json()
+            setPaymentHistory(historyData.payments || [])
+        setLoadingHistory(false)          }
+        } catch (historyErr) {
+          console.error("Error loading payment history:", historyErr)
+        } finally {
+          setLoadingHistory(false)
+        }      }
     }
 
     if (user) {
       fetchClientData()
-      fetchPaymentHistory()
     }
+  }, [user, getIdToken])
+
+  // Auto-refresco cada 30 segundos para actualizar próximo período
+  useEffect(() => {
+    if (!user) return
+
+    const interval = setInterval(async () => {
+      await refreshClientData()
+    }, 30000) // 30 segundos
+
+    return () => clearInterval(interval)
   }, [user, getIdToken])
 
   if (!user) return null
@@ -181,7 +312,7 @@ function PaymentsPage() {
 
   const handleOpenWhatsApp = () => {
     const message = encodeURIComponent(
-      `Hola, soy ${user.name} y quiero enviar el comprobante de pago del período ${nextPayment.period}. Mi email es ${user.email}.`
+      `Hola, soy ${user.name} y quiero enviar el comprobante de pago del período ${nextPaymentInfo.period}. Mi email es ${user.email}.`
     )
     window.open(`https://wa.me/5491112345678?text=${message}`, '_blank')
   }
@@ -200,8 +331,8 @@ function PaymentsPage() {
         userEmail: user.email,
         amount: (clientData.plan as any).price,
         planName: clientData.plan.name,
-        period: nextPayment.period,
-        dueDate: nextPayment.dueDate,
+        period: nextPaymentInfo.period,
+        dueDate: nextPaymentInfo.dueDate,
         requestDate: new Date().toISOString(),
         status: 'pending'
       }
@@ -247,7 +378,20 @@ function PaymentsPage() {
         <div className="grid gap-6 md:grid-cols-2 mb-8">
           {/* Detalles del Plan Actual */}
           <Card className="p-6 border-2 border-primary/20">
-            <h3 className="text-xl font-bold mb-4">Detalles del Plan</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold">Detalles del Plan</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshClientData}
+                className="flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refrescar
+              </Button>
+            </div>
             {clientData?.plan ? (
               <>
                 <div className="mb-6">
@@ -311,13 +455,13 @@ function PaymentsPage() {
                           <p className="text-2xl font-bold text-yellow-800">
                             ${(clientData.plan as any).price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                           </p>
-                          <p className="text-xs text-yellow-700 mt-1">Referencia: {nextPayment.period}</p>
+                          <p className="text-xs text-yellow-700 mt-1">Referencia: {nextPaymentInfo.period}</p>
                         </div>
 
                         <div className="text-center">
                           <p className="text-sm text-muted-foreground mb-2">Período de pago</p>
                           <p className="font-semibold">Del 1 al 10 de cada mes</p>
-                          <p className="text-xs text-muted-foreground mt-1">Vence el {nextPayment.dueDate}</p>
+                          <p className="text-xs text-muted-foreground mt-1">Vence el {nextPaymentInfo.dueDate}</p>
                         </div>
                       </div>
 
@@ -376,15 +520,15 @@ function PaymentsPage() {
           <Card className="p-6 border">
             <h3 className="text-xl font-bold mb-4">Próximo Pago</h3>
             <div className="space-y-4">
-              <div className={`p-4 ${nextPayment.isOverdue ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'} border rounded-lg`}>
+              <div className={`p-4 ${nextPaymentInfo.isOverdue ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'} border rounded-lg`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-red-800">Estado</span>
-                  <Badge className={nextPayment.isOverdue ? 'bg-red-600 text-white' : 'bg-yellow-600 text-white'}>
-                    {nextPayment.isOverdue ? 'Vencido' : 'Pendiente de pago'}
+                  <Badge className={nextPaymentInfo.isOverdue ? 'bg-red-600 text-white' : 'bg-yellow-600 text-white'}>
+                    {nextPaymentInfo.isOverdue ? 'Vencido' : 'Pendiente de pago'}
                   </Badge>
                 </div>
-                <p className="text-lg font-bold text-red-800">{nextPayment.period}</p>
-                <p className="text-sm text-red-700">Vence el {nextPayment.dueDate}</p>
+                <p className="text-lg font-bold text-red-800">{nextPaymentInfo.period}</p>
+                <p className="text-sm text-red-700">Vence el {nextPaymentInfo.dueDate}</p>
               </div>
               
               <div className="text-center">
@@ -442,6 +586,7 @@ function PaymentsPage() {
           </div>
         </Card>
       </main>
+      <Toaster />
     </div>
   )
 }

@@ -34,15 +34,28 @@ export default function PaymentRequestsPage() {
 
   useEffect(() => {
     fetchPaymentRequests()
+    
+    // Auto-refresco cada 30 segundos para mantener datos actualizados
+    const interval = setInterval(() => {
+      fetchPaymentRequests()
+    }, 30000)
+    
+    return () => clearInterval(interval)
   }, [])
 
   const fetchPaymentRequests = async () => {
     try {
+      // Limpiar estado anterior para evitar datos antiguos
+      setRequests([])
+      setLoading(true)
+      setError(null)
+      
       const token = await getIdToken()
       if (!token) {
         throw new Error('No se pudo obtener el token de autenticación')
       }
       
+      console.log('Fetching payment requests...')
       const response = await fetch('/api/payment-requests', {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -59,11 +72,19 @@ export default function PaymentRequestsPage() {
       }
       
       const data = await response.json()
-      setRequests(data.requests || [])
+      console.log('Received data:', data)
+      console.log('Requests count:', data.requests?.length || 0)
+      
+      // Filtrar solo solicitudes pendientes para mayor seguridad
+      const pendingRequests = (data.requests || []).filter((req: PaymentRequest) => req.status === 'pending')
+      console.log('Pending requests:', pendingRequests)
+      
+      setRequests(pendingRequests)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
       console.error('Error:', err)
       setError(errorMessage)
+      setRequests([]) // Limpiar en caso de error
     } finally {
       setLoading(false)
     }
@@ -93,7 +114,7 @@ export default function PaymentRequestsPage() {
       }
 
       // Actualizar la lista de solicitudes
-      setRequests(requests.filter(req => req.id !== requestId))
+      setRequests(requests.filter((req: PaymentRequest) => req.id !== requestId))
       
       // Mostrar mensaje de éxito
       if (action === 'approve') {
@@ -175,9 +196,22 @@ export default function PaymentRequestsPage() {
       )}
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold">Solicitudes de Pago</h1>
-          <p className="text-muted-foreground mt-2">Revisa y procesa las solicitudes de pago de los clientes</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold">Solicitudes de Pago</h1>
+            <p className="text-muted-foreground mt-2">Revisa y procesa las solicitudes de pago de los clientes</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={fetchPaymentRequests}
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refrescar
+          </Button>
         </div>
 
         {requests.length === 0 ? (
