@@ -147,13 +147,13 @@ export default function PaymentsPage() {
     router.push("/")
   }
 
-  const handleCopyData = () => {
-    const transferData = `Alias: RamosGenerales.mp\nCBU/CVU: 00000031000000000000000\nTitular: Ramos Generales S.A.\nCUIT: 30-12345678-9\nImporte: $${(clientData?.plan as any)?.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\nReferencia: ${nextPayment.period}`
+  const handleCopyAlias = () => {
+    const alias = "RamosGenerales.mp"
     
-    navigator.clipboard.writeText(transferData).then(() => {
-      alert('Datos copiados al portapapeles')
+    navigator.clipboard.writeText(alias).then(() => {
+      alert('Alias copiado al portapapeles')
     }).catch(() => {
-      alert('Error al copiar los datos')
+      alert('Error al copiar el alias')
     })
   }
 
@@ -261,9 +261,9 @@ export default function PaymentsPage() {
                         </Button>
                         <Button
                           className="flex-1"
-                          onClick={handleCopyData}
+                          onClick={handleCopyAlias}
                         >
-                          Copiar Datos
+                          Copiar Alias
                         </Button>
                       </div>
 
