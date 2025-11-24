@@ -1,6 +1,20 @@
 import { NextResponse } from "next/server"
 import { adminAuth, adminDb } from "@/lib/firebase-admin"
 
+interface PaymentRequestData {
+  clientId: string
+  userId: string
+  userName: string
+  userEmail: string
+  amount: number
+  planName: string
+  period: string
+  dueDate: string
+  requestDate: string
+  status: 'pending' | 'approved' | 'rejected'
+  createdAt?: any
+}
+
 const unauthorizedResponse = NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 const forbiddenResponse = NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
@@ -29,27 +43,38 @@ async function ensureAdmin(request: Request) {
 
 export async function PATCH(
   request: Request, 
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const resolvedParams = await params
+  console.log('PATCH request received for ID:', resolvedParams.id)
+  
   const { response } = await ensureAdmin(request)
   if (response) return response
 
-  const { id } = params
+  const { id } = resolvedParams
   const { action, reason } = await request.json()
+
+  console.log('Processing action:', action, 'for request:', id)
 
   try {
     const paymentRequestRef = adminDb.collection("payment_requests").doc(id)
     const paymentRequestDoc = await paymentRequestRef.get()
 
+    console.log('Payment request doc exists:', paymentRequestDoc.exists)
+
     if (!paymentRequestDoc.exists) {
+      console.log('Payment request not found:', id)
       return NextResponse.json({ error: "Solicitud no encontrada" }, { status: 404 })
     }
 
-    const requestData = paymentRequestDoc.data()
+    const requestData = paymentRequestDoc.data() as PaymentRequestData
     
     if (!requestData) {
+      console.log('Payment request data is null/undefined')
       return NextResponse.json({ error: "Datos de solicitud no encontrados" }, { status: 404 })
     }
+
+    console.log('Request data:', requestData)
 
     if (action === "approve") {
       // Actualizar el estado de la solicitud
@@ -97,8 +122,12 @@ export async function PATCH(
 
   } catch (error) {
     console.error("Error processing payment request:", error)
+    console.error("Error details:", {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    })
     return NextResponse.json({ 
-      error: "Error interno del servidor" 
+      error: error instanceof Error ? error.message : "Error interno del servidor" 
     }, { status: 500 })
   }
 }
