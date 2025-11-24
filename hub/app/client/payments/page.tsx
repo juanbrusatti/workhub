@@ -15,6 +15,7 @@ export default function PaymentsPage() {
   const [clientData, setClientData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showTransferModal, setShowTransferModal] = useState(false)
 
   // Calcular próximo período de pago
   const getNextPaymentPeriod = () => {
@@ -146,6 +147,23 @@ export default function PaymentsPage() {
     router.push("/")
   }
 
+  const handleCopyData = () => {
+    const transferData = `Alias: RamosGenerales.mp\nCBU/CVU: 00000031000000000000000\nTitular: Ramos Generales S.A.\nCUIT: 30-12345678-9\nImporte: $${(clientData?.plan as any)?.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}\nReferencia: ${nextPayment.period}`
+    
+    navigator.clipboard.writeText(transferData).then(() => {
+      alert('Datos copiados al portapapeles')
+    }).catch(() => {
+      alert('Error al copiar los datos')
+    })
+  }
+
+  const handleOpenWhatsApp = () => {
+    const message = encodeURIComponent(
+      `Hola, soy ${user.name} y quiero enviar el comprobante de pago del período ${nextPayment.period}. Mi email es ${user.email}.`
+    )
+    window.open(`https://wa.me/5491112345678?text=${message}`, '_blank')
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <ClientNav user={user} onLogout={handleLogout} />
@@ -182,9 +200,88 @@ export default function PaymentsPage() {
                   </p>
                 </div>
 
-                <Button className="w-full mb-2">
+                <Button 
+                  className="w-full mb-2"
+                  onClick={() => setShowTransferModal(true)}
+                >
                   Pagar Ahora
                 </Button>
+
+                {/* Modal de Transferencia */}
+                {showTransferModal && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                      <h3 className="text-xl font-bold mb-4">Pagar por Transferencia</h3>
+                      
+                      <div className="space-y-4 mb-6">
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm font-medium text-blue-800 mb-2">Datos para la transferencia:</p>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Alias:</span>
+                              <span className="font-mono text-sm">RamosGenerales.mp</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">CBU/CVU:</span>
+                              <span className="font-mono text-xs">00000031000000000000000</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Titular:</span>
+                              <span className="text-sm">Ramos Generales S.A.</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">CUIT:</span>
+                              <span className="text-sm">30-12345678-9</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm font-medium text-yellow-800 mb-1">Importe a transferir:</p>
+                          <p className="text-2xl font-bold text-yellow-800">
+                            ${(clientData.plan as any).price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-yellow-700 mt-1">Referencia: {nextPayment.period}</p>
+                        </div>
+
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground mb-2">Período de pago</p>
+                          <p className="font-semibold">Del 1 al 10 de cada mes</p>
+                          <p className="text-xs text-muted-foreground mt-1">Vence el {nextPayment.dueDate}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setShowTransferModal(false)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          className="flex-1"
+                          onClick={handleCopyData}
+                        >
+                          Copiar Datos
+                        </Button>
+                      </div>
+
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Una vez realizada la transferencia, envía el comprobante a:
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">WhatsApp:</span>
+                          <span className="text-sm">+54 9 11 1234-5678</span>
+                          <Button size="sm" variant="outline" onClick={handleOpenWhatsApp}>
+                            Contactar
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <p className="text-muted-foreground">No hay plan asignado</p>
