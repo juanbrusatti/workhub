@@ -6,11 +6,14 @@ import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/components/ui/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { format } from "date-fns"
 
-export default function PaymentsPage() {
+function PaymentsPage() {
   const { user, logout, getIdToken } = useAuth()
+  const { toast } = useToast()
   const router = useRouter()
   const [clientData, setClientData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -151,9 +154,16 @@ export default function PaymentsPage() {
     const alias = "RamosGenerales.mp"
     
     navigator.clipboard.writeText(alias).then(() => {
-      alert('Alias copiado al portapapeles')
+      toast({
+        title: "Alias copiado",
+        description: "RamosGenerales.mp se ha copiado al portapapeles",
+      })
     }).catch(() => {
-      alert('Error al copiar el alias')
+      toast({
+        title: "Error",
+        description: "No se pudo copiar el alias",
+        variant: "destructive",
+      })
     })
   }
 
@@ -162,6 +172,54 @@ export default function PaymentsPage() {
       `Hola, soy ${user.name} y quiero enviar el comprobante de pago del período ${nextPayment.period}. Mi email es ${user.email}.`
     )
     window.open(`https://wa.me/5491112345678?text=${message}`, '_blank')
+  }
+
+  const handleMarkAsPaid = async () => {
+    try {
+      const token = await getIdToken()
+      if (!token) {
+        throw new Error('No se pudo obtener el token de autenticación')
+      }
+
+      const paymentRequest = {
+        clientId: clientData.id,
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        amount: (clientData.plan as any).price,
+        planName: clientData.plan.name,
+        period: nextPayment.period,
+        dueDate: nextPayment.dueDate,
+        requestDate: new Date().toISOString(),
+        status: 'pending'
+      }
+
+      const response = await fetch('/api/payment-requests', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(paymentRequest)
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al enviar la solicitud de pago')
+      }
+
+      toast({
+        title: "Solicitud enviada",
+        description: "Tu solicitud de pago ha sido enviada al administrador",
+      })
+      
+      setShowTransferModal(false)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo enviar la solicitud de pago",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -209,8 +267,8 @@ export default function PaymentsPage() {
 
                 {/* Modal de Transferencia */}
                 {showTransferModal && (
-                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                  <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 border-2 border-gray-300 shadow-2xl">
                       <h3 className="text-xl font-bold mb-4">Pagar por Transferencia</h3>
                       
                       <div className="space-y-4 mb-6">
@@ -266,6 +324,13 @@ export default function PaymentsPage() {
                           Copiar Alias
                         </Button>
                       </div>
+
+                      <Button
+                        className="w-full mt-3 bg-green-600 hover:bg-green-700"
+                        onClick={handleMarkAsPaid}
+                      >
+                        Marcar como Pagado
+                      </Button>
 
                       <div className="mt-4 pt-4 border-t">
                         <p className="text-sm text-muted-foreground mb-2">
@@ -356,3 +421,5 @@ export default function PaymentsPage() {
     </div>
   )
 }
+
+export default PaymentsPage
