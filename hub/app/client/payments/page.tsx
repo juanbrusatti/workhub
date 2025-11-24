@@ -50,36 +50,9 @@ function PaymentsPage() {
   }
   
   const nextPayment = getNextPaymentPeriod()
-  // Historial de pagos harcodeado
-  const [paymentHistory] = useState([
-    {
-      id: "1",
-      date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      amount: 15000,
-      plan: "Plan Profesional",
-      period: "Noviembre 2024",
-      status: "pagado" as const,
-      transactionId: "TXN-2024-001",
-    },
-    {
-      id: "2",
-      date: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
-      amount: 15000,
-      plan: "Plan Profesional",
-      period: "Octubre 2024",
-      status: "pagado" as const,
-      transactionId: "TXN-2024-002",
-    },
-    {
-      id: "3",
-      date: new Date(),
-      amount: 15000,
-      plan: "Plan Profesional",
-      period: nextPayment.period,
-      status: "pendiente" as const,
-      transactionId: "TXN-2024-003",
-    },
-  ])
+  // Historial de pagos dinámico
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(true)
 
   useEffect(() => {
     // Obtener datos del cliente
@@ -95,11 +68,13 @@ function PaymentsPage() {
             'Authorization': `Bearer ${token}`
           }
         })
+        
         if (!response.ok) {
           throw new Error('Error al cargar los datos del cliente')
         }
+        
         const data = await response.json()
-        setClientData(data)
+        setClientData(data.client)
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
         console.error('Error:', err)
@@ -109,8 +84,45 @@ function PaymentsPage() {
       }
     }
 
+    // Obtener historial de pagos
+    const fetchPaymentHistory = async () => {
+      try {
+        const token = await getIdToken()
+        if (!token) {
+          throw new Error('No se pudo obtener el token de autenticación')
+        }
+        
+        console.log('Fetching payment history...')
+        const response = await fetch('/api/payment-history', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        
+        console.log('Payment history response status:', response.status)
+        console.log('Payment history response ok:', response.ok)
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.error('Payment history error response:', errorData)
+          throw new Error(errorData.error || 'Error al cargar el historial de pagos')
+        }
+        
+        const data = await response.json()
+        console.log('Payment history data:', data)
+        setPaymentHistory(data.payments || [])
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+        console.error('Error al cargar historial:', err)
+        setError(errorMessage)
+      } finally {
+        setLoadingHistory(false)
+      }
+    }
+
     if (user) {
       fetchClientData()
+      fetchPaymentHistory()
     }
   }, [user, getIdToken])
 
@@ -394,14 +406,13 @@ function PaymentsPage() {
                   <th className="text-left py-3">Plan</th>
                   <th className="text-left py-3">Importe</th>
                   <th className="text-left py-3">Estado</th>
-                  <th className="text-left py-3">ID Transacción</th>
                 </tr>
               </thead>
               <tbody>
                 {paymentHistory.map((payment) => (
                   <tr key={payment.id} className="border-b">
                     <td className="py-3">{payment.period}</td>
-                    <td className="py-3">{payment.plan}</td>
+                    <td className="py-3">{payment.planName}</td>
                     <td className="py-3 font-semibold">
                       ${payment.amount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                     </td>
@@ -410,9 +421,22 @@ function PaymentsPage() {
                         {payment.status === 'pagado' ? 'Pagado' : 'Pendiente'}
                       </Badge>
                     </td>
-                    <td className="py-3 text-muted-foreground text-xs font-mono">{payment.transactionId}</td>
                   </tr>
                 ))}
+                {paymentHistory.length === 0 && !loadingHistory && (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                      No hay pagos registrados
+                    </td>
+                  </tr>
+                )}
+                {loadingHistory && (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center">
+                      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
