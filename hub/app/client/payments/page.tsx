@@ -126,7 +126,7 @@ function PaymentsPage() {
 
     const interval = setInterval(async () => {
       await refreshClientData()
-    }, 30000) // 30 segundos
+    }, 60000) // 30 segundos
 
     return () => clearInterval(interval)
   }, [user, getIdToken])
@@ -252,7 +252,7 @@ function PaymentsPage() {
 
     const interval = setInterval(async () => {
       await refreshClientData()
-    }, 30000) // 30 segundos
+    }, 60000) // 30 segundos
 
     return () => clearInterval(interval)
   }, [user, getIdToken])

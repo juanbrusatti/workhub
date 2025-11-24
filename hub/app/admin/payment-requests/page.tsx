@@ -35,11 +35,10 @@ export default function PaymentRequestsPage() {
   useEffect(() => {
     fetchPaymentRequests()
     
-    // Auto-refresco cada 30 segundos para mantener datos actualizados
+    // Auto-refresco cada 60 segundos para mantener datos actualizados (reducido para producción)
     const interval = setInterval(() => {
       fetchPaymentRequests()
-    }, 30000)
-    
+    }, 60000) // 60 segundos  
     return () => clearInterval(interval)
   }, [])
 
