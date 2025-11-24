@@ -12,7 +12,7 @@ import { useState, useEffect } from "react"
 export default function ClientDashboard() {
   const { user, logout } = useAuth()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState("overview")
+  const [activeTab, setActiveTab] = useState("resumen")
 
   useEffect(() => {
     // Register service worker
@@ -45,13 +45,13 @@ export default function ClientDashboard() {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold">Welcome, {user.name}!</h1>
+          <h1 className="text-4xl font-bold">¡Bienvenido/a, {user.name}!</h1>
           <p className="text-muted-foreground mt-2">{user.companyName}</p>
         </div>
 
         {/* Navigation tabs */}
         <div className="flex gap-4 mb-8 border-b">
-          {["overview", "reservations", "wifi", "announcements"].map((tab) => (
+          {["resumen", "reservas", "wifi", "anuncios"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -67,31 +67,31 @@ export default function ClientDashboard() {
         </div>
 
         {/* Tab content */}
-        {activeTab === "overview" && (
+        {activeTab === "resumen" && (
           <div className="grid gap-6 md:grid-cols-2">
             <MembershipCard plan={plan} client={clientData} />
           </div>
         )}
 
-        {activeTab === "reservations" && <ReservationSection clientId={clientData?.id || ""} />}
+        {activeTab === "reservas" && <ReservationSection clientId={clientData?.id || ""} />}
 
         {activeTab === "wifi" && (
           <div className="bg-card rounded-lg p-6 border">
-            <h2 className="text-2xl font-bold mb-4">WiFi Access</h2>
+            <h2 className="text-2xl font-bold mb-4">Acceso WiFi</h2>
             <div className="space-y-4">
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <p className="text-sm text-muted-foreground">Network Name</p>
-                <p className="font-mono text-lg">CoWorkHub-5GHz</p>
+                <p className="text-sm text-muted-foreground">Nombre de la red</p>
+                <p className="font-mono text-lg">RamosGenerales-5GHz</p>
               </div>
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <p className="text-sm text-muted-foreground">Password</p>
-                <p className="font-mono text-lg">SecurePass2024!</p>
+                <p className="text-sm text-muted-foreground">Contraseña</p>
+                <p className="font-mono text-lg">Ramos1234!</p>
               </div>
             </div>
           </div>
         )}
 
-        {activeTab === "announcements" && <AnnouncementsSection />}
+        {activeTab === "anuncios" && <AnnouncementsSection />}
       </main>
     </div>
   )

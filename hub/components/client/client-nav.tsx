@@ -16,17 +16,14 @@ export default function ClientNav({ user, onLogout }: ClientNavProps) {
       <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold">
-              C
-            </div>
-            <span className="font-bold text-lg hidden sm:inline">CoWorkHub</span>
+            <span className="font-bold text-lg hidden sm:inline">Ramos Generales</span>
           </div>
           <div className="hidden md:flex gap-4">
             <Link href="/client/dashboard" className="text-sm hover:text-primary">
-              Dashboard
+              Panel
             </Link>
             <Link href="/client/payments" className="text-sm hover:text-primary">
-              Billing
+              Facturación
             </Link>
           </div>
         </div>
@@ -42,7 +39,7 @@ export default function ClientNav({ user, onLogout }: ClientNavProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem className="text-sm">{user.email}</DropdownMenuItem>
-            <DropdownMenuItem onClick={onLogout}>Logout</DropdownMenuItem>
+            <DropdownMenuItem onClick={onLogout}>Cerrar sesión</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
