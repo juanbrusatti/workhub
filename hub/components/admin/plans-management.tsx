@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { format } from "date-fns"
 
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
@@ -457,7 +458,7 @@ export default function PlansManagement() {
                     <h4 className="text-lg font-bold">{plan.name}</h4>
                     <p className="text-sm text-muted-foreground">{plan.description || "Sin descripción"}</p>
                   </div>
-                  <span className="text-sm font-semibold">{new Date(plan.created_at).toLocaleDateString()}</span>
+                  <span className="text-sm font-semibold">{format(new Date(plan.created_at), "dd/MM/yyyy")}</span>
                 </div>
 
                 <div className="space-y-1 text-sm">
