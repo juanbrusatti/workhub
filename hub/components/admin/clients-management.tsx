@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Plus, Users } from "lucide-react"
+import { Loader2, Plus, Users, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { useAuth } from "@/lib/auth-context"
@@ -53,12 +54,13 @@ export default function ClientsManagement() {
     email: "", 
     password: "", 
     company: "", 
-    plan: "" 
+    plan: "no-plan" // Inicializar con "no-plan" para que muestre "Sin plan por ahora"
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(4)
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null)
   const { getIdToken } = useAuth()
   const { toast } = useToast()
 
@@ -176,12 +178,10 @@ export default function ClientsManagement() {
           setPlans(fetchedPlans)
 
           if (fetchedPlans.length > 0) {
-            setNewClient(prev => {
-              const currentPlanExists = fetchedPlans.some(plan => plan.id === prev.plan)
-              return { ...prev, plan: currentPlanExists ? prev.plan : fetchedPlans[0].id }
-            })
-          } else {
-            setNewClient(prev => ({ ...prev, plan: "" }))
+            // No cambiar automáticamente el plan seleccionado si ya está en "no-plan"
+            if (newClient.plan !== "no-plan" && !fetchedPlans.some(plan => plan.id === newClient.plan)) {
+              setNewClient(prev => ({ ...prev, plan: "no-plan" }))
+            }
           }
 
           await fetchClients()
@@ -243,7 +243,7 @@ export default function ClientsManagement() {
           password: newClient.password,
           name: newClient.name,
           companyName: newClient.company,
-          planId: newClient.plan,
+          planId: newClient.plan || null, // Enviar null si no hay plan seleccionado
         }),
       })
 
@@ -254,14 +254,9 @@ export default function ClientsManagement() {
         return
       }
 
-      // Obtener el plan seleccionado
-      const selectedPlan = plans.find(plan => plan.id === newClient.plan)
+      // Obtener el plan seleccionado (si hay uno)
+      const selectedPlan = newClient.plan ? plans.find(plan => plan.id === newClient.plan) : null
       
-      if (!selectedPlan) {
-        throw new Error('No se pudo encontrar el plan seleccionado')
-      }
-      
-
       const newClientEntry = {
         id: payload.uid || payload.id,
         userId: payload.uid || payload.id,
@@ -276,25 +271,25 @@ export default function ClientsManagement() {
         companyName: newClient.company || '',
         plan: selectedPlan,
         subscriptionStartDate: new Date(),
-        subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días después
+        subscriptionEndDate: selectedPlan ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null, // Solo si hay plan
         status: "active" as const,
         createdAt: new Date(),
       }
 
       setClients([newClientEntry, ...clients])
       setShowAddForm(false)
-      // Resetear el formulario manteniendo el plan seleccionado
+      // Resetear el formulario
       setNewClient({ 
         name: "", 
         email: "", 
         password: "", 
         company: "", 
-        plan: plans[0]?.id || "" 
+        plan: "no-plan" // Resetear a "no-plan" para que muestre "Sin plan por ahora"
       })
       
       toast({
         title: "Cliente creado",
-        description: `El cliente ${newClient.name} ha sido creado exitosamente`,
+        description: `El cliente ${newClient.name} ha sido creado exitosamente${selectedPlan ? ' con plan asignado' : ' sin plan asignado'}`,
       })
     } catch (error) {
       console.error(error)
@@ -416,6 +411,46 @@ export default function ClientsManagement() {
     }
   }
 
+  const handleDeleteClient = async (clientId: string, clientName: string) => {
+    setDeletingClientId(clientId)
+    
+    try {
+      const token = await getIdToken()
+      if (!token) {
+        throw new Error("No se pudo obtener el token de autenticación")
+      }
+
+      const response = await fetch(`/api/admin/clients/${clientId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.error || "No se pudo eliminar el cliente")
+      }
+
+      // Eliminar el cliente de la lista local
+      setClients(prevClients => prevClients.filter(client => client.id !== clientId))
+      
+      toast({
+        title: "Cliente eliminado",
+        description: `El cliente ${clientName} ha sido eliminado correctamente`,
+      })
+    } catch (error) {
+      console.error("Error eliminando cliente", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "No se pudo eliminar el cliente",
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingClientId(null)
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(clients.length / itemsPerPage))
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedClients = clients.slice(startIndex, startIndex + itemsPerPage)
@@ -511,15 +546,18 @@ export default function ClientsManagement() {
             </div>
             
             <div>
-              <Label>Plan de pago <span className="text-destructive">*</span></Label>
+              <Label>Plan de pago (opcional)</Label>
               <Select
                 value={newClient.plan}
-                onValueChange={(value) => setNewClient({ ...newClient, plan: value })}
+                onValueChange={(value) => setNewClient({ ...newClient, plan: value === "no-plan" ? "" : value })}
               >
                 <SelectTrigger className="w-full mt-1">
-                  <SelectValue placeholder="Selecciona un plan" />
+                  <SelectValue placeholder="Selecciona un plan (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="no-plan">
+                    <span className="text-muted-foreground">Sin plan por ahora</span>
+                  </SelectItem>
                   {plans.map((plan) => (
                     <SelectItem key={plan.id} value={plan.id}>
                       {plan.name} (${plan.price}/mes)
@@ -527,6 +565,9 @@ export default function ClientsManagement() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Puedes asignar un plan más tarde si lo deseas
+              </p>
             </div>
             {formError && (
               <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-md">
@@ -544,7 +585,7 @@ export default function ClientsManagement() {
               </Button>
               <Button 
                 onClick={handleAddClient} 
-                disabled={isSubmitting || !newClient.plan}
+                disabled={isSubmitting}
                 className="gap-2"
               >
                 {isSubmitting ? (
@@ -620,6 +661,58 @@ export default function ClientsManagement() {
                         ))
                       )}
                     </select>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={deletingClientId === client.id}
+                          className="gap-2"
+                        >
+                          {deletingClientId === client.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Eliminando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-4 w-4" />
+                              <span>Eliminar</span>
+                            </>
+                          )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta acción eliminará permanentemente al cliente <strong>{client.user.name}</strong> y todos sus datos asociados.
+                          </AlertDialogDescription>
+                          <div className="mt-2 text-sm text-muted-foreground">
+                            <p className="font-medium mb-2">Se eliminará:</p>
+                            <ul className="list-disc list-inside space-y-1">
+                              <li>Historial de pagos</li>
+                              <li>Solicitudes de pago</li>
+                              <li>Configuración de cuenta</li>
+                              <li>Acceso al sistema</li>
+                            </ul>
+                            <p className="mt-3 text-destructive font-medium">
+                              Esta acción no se puede deshacer.
+                            </p>
+                          </div>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteClient(client.id, client.user.name)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Eliminar permanentemente
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               </Card>
