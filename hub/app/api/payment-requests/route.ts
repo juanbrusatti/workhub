@@ -13,6 +13,7 @@ interface PaymentRequestData {
   dueDate: string
   requestDate: string
   status: 'pending' | 'approved' | 'rejected'
+  receiptImage?: string // Base64 image
   createdAt?: any
 }
 
@@ -54,7 +55,8 @@ export async function POST(request: Request) {
         amount: paymentRequest.amount,
         planName: paymentRequest.planName,
         period: paymentRequest.period,
-        requestDate: paymentRequest.requestDate
+        requestDate: paymentRequest.requestDate,
+        receiptImage: paymentRequest.receiptImage
       })
     } catch (emailError) {
       console.error("Error enviando email de notificación:", emailError)

@@ -7,6 +7,7 @@ interface PaymentRequestEmailData {
   planName: string
   period: string
   requestDate: string
+  receiptImage?: string // Base64 image
 }
 
 export async function sendPaymentRequestEmail(data: PaymentRequestEmailData) {
@@ -27,7 +28,7 @@ export async function sendPaymentRequestEmail(data: PaymentRequestEmailData) {
     }).format(data.amount)
 
     // Crear el contenido del email
-    const emailContent = `
+    let emailContent = `
       <h2>Nueva Solicitud de Pago</h2>
       <p>Se ha recibido una nueva solicitud de pago con los siguientes detalles:</p>
       
@@ -46,12 +47,37 @@ export async function sendPaymentRequestEmail(data: PaymentRequestEmailData) {
       <p><em>Este es un mensaje automático generado por WorkHub.</em></p>
     `
 
-    // Enviar el email
-    const mailOptions = {
+    // Si hay comprobante, agregar información sobre el adjunto
+    if (data.receiptImage) {
+      emailContent += `
+        <div style="background-color: #e7f3ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p><strong>📎 Comprobante de pago adjunto</strong></p>
+          <p>El cliente ha adjuntado el comprobante de transferencia. Revisa el archivo adjunto en este email.</p>
+        </div>
+      `
+    }
+
+    // Preparar las opciones del email
+    const mailOptions: any = {
       from: process.env.EMAIL_USER,
       to: 'coworkhub25@gmail.com',
       subject: `Nueva Solicitud de Pago - ${data.userName}`,
       html: emailContent
+    }
+
+    // Adjuntar el comprobante si está disponible
+    if (data.receiptImage) {
+      // Convertir base64 a buffer para el adjunto
+      const base64Data = data.receiptImage.replace(/^data:image\/\w+;base64,/, '')
+      const buffer = Buffer.from(base64Data, 'base64')
+      
+      mailOptions.attachments = [
+        {
+          filename: `comprobante_${data.userName.replace(/\s+/g, '_')}_${data.period.replace(/\s+/g, '_')}.jpg`,
+          content: buffer,
+          contentType: 'image/jpeg'
+        }
+      ]
     }
 
     const result = await transporter.sendMail(mailOptions)

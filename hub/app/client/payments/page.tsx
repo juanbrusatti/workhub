@@ -19,6 +19,9 @@ function PaymentsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showTransferModal, setShowTransferModal] = useState(false)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
 
   // Calcular próximo período de pago
   const getNextPaymentPeriod = () => {
@@ -332,12 +335,70 @@ function PaymentsPage() {
     window.open(`https://wa.me/5491112345678?text=${message}`, '_blank')
   }
 
+  const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validar que sea una imagen
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Error",
+          description: "El archivo debe ser una imagen (JPG, PNG, etc.)",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Validar tamaño (máximo 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Error",
+          description: "La imagen no puede superar los 5MB",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setReceiptFile(file)
+      
+      // Crear vista previa
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setReceiptPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const clearReceipt = () => {
+    setReceiptFile(null)
+    setReceiptPreview(null)
+  }
+
   const handleMarkAsPaid = async () => {
+    if (!receiptFile) {
+      toast({
+        title: "Error",
+        description: "Por favor, adjunta el comprobante de pago",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setUploading(true)
+    
     try {
       const token = await getIdToken()
       if (!token) {
         throw new Error('No se pudo obtener el token de autenticación')
       }
+
+      // Convertir la imagen a base64
+      const reader = new FileReader()
+      const receiptBase64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(receiptFile)
+      })
 
       const paymentRequest = {
         clientId: clientData.id,
@@ -349,7 +410,8 @@ function PaymentsPage() {
         period: nextPaymentInfo.period,
         dueDate: nextPaymentInfo.dueDate,
         requestDate: new Date().toISOString(),
-        status: 'pending'
+        status: 'pending',
+        receiptImage: receiptBase64 // Agregar el comprobante en base64
       }
 
       const response = await fetch('/api/payment-requests', {
@@ -367,9 +429,11 @@ function PaymentsPage() {
 
       toast({
         title: "Solicitud enviada",
-        description: "Tu solicitud de pago ha sido enviada al administrador",
+        description: "Tu solicitud de pago con comprobante ha sido enviada al administrador",
       })
       
+      // Limpiar el formulario
+      clearReceipt()
       setShowTransferModal(false)
     } catch (error) {
       toast({
@@ -377,6 +441,8 @@ function PaymentsPage() {
         description: "No se pudo enviar la solicitud de pago",
         variant: "destructive",
       })
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -439,7 +505,7 @@ function PaymentsPage() {
                 {/* Modal de Transferencia */}
                 {showTransferModal && (
                   <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 border-2 border-gray-300 shadow-2xl">
+                    <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 border-2 border-gray-300 shadow-2xl max-h-[90vh] overflow-y-auto">
                       <h3 className="text-xl font-bold mb-4">Pagar por Transferencia</h3>
                       
                       <div className="space-y-4 mb-6">
@@ -473,6 +539,54 @@ function PaymentsPage() {
                           <p className="text-xs text-yellow-700 mt-1">Referencia: {nextPaymentInfo.period}</p>
                         </div>
 
+                        {/* Campo de carga de comprobante */}
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-sm font-medium text-green-800 mb-3">📸 Adjuntar comprobante de pago:</p>
+                          
+                          {!receiptPreview ? (
+                            <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center">
+                              <input
+                                type="file"
+                                id="receipt"
+                                accept="image/*"
+                                onChange={handleReceiptChange}
+                                className="hidden"
+                              />
+                              <label
+                                htmlFor="receipt"
+                                className="cursor-pointer block"
+                              >
+                                <div className="text-green-600 mb-2">
+                                  <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                  </svg>
+                                </div>
+                                <p className="text-sm text-green-700 font-medium">Hacer clic para subir comprobante</p>
+                                <p className="text-xs text-green-600 mt-1">JPG, PNG - Máximo 5MB</p>
+                              </label>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="relative">
+                                <img
+                                  src={receiptPreview}
+                                  alt="Vista previa del comprobante"
+                                  className="w-full h-48 object-cover rounded-lg border"
+                                />
+                                <button
+                                  onClick={clearReceipt}
+                                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                              <p className="text-sm text-green-700 font-medium text-center">✅ Comprobante cargado</p>
+                            </div>
+                          )}
+                        </div>
+
                         <div className="text-center">
                           <p className="text-sm text-muted-foreground mb-2">Período de pago</p>
                           <p className="font-semibold">Del 1 al 10 de cada mes</p>
@@ -484,13 +598,18 @@ function PaymentsPage() {
                         <Button
                           variant="outline"
                           className="flex-1"
-                          onClick={() => setShowTransferModal(false)}
+                          onClick={() => {
+                            setShowTransferModal(false)
+                            clearReceipt()
+                          }}
+                          disabled={uploading}
                         >
                           Cancelar
                         </Button>
                         <Button
                           className="flex-1"
                           onClick={handleCopyAlias}
+                          disabled={uploading}
                         >
                           Copiar Alias
                         </Button>
@@ -499,22 +618,23 @@ function PaymentsPage() {
                       <Button
                         className="w-full mt-3 bg-green-600 hover:bg-green-700"
                         onClick={handleMarkAsPaid}
+                        disabled={uploading || !receiptFile}
                       >
-                        Marcar como Pagado
+                        {uploading ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                            Enviando...
+                          </>
+                        ) : (
+                          'Enviar Solicitud con Comprobante'
+                        )}
                       </Button>
 
-                      <div className="mt-4 pt-4 border-t">
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Una vez realizada la transferencia, envía el comprobante a:
+                      {!receiptFile && (
+                        <p className="text-xs text-amber-600 text-center mt-2">
+                          ⚠️ Debes adjuntar el comprobante para continuar
                         </p>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">WhatsApp:</span>
-                          <span className="text-sm">+54 9 11 1234-5678</span>
-                          <Button size="sm" variant="outline" onClick={handleOpenWhatsApp}>
-                            Contactar
-                          </Button>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 )}
