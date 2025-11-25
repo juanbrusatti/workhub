@@ -32,21 +32,6 @@ export default function LoginForm() {
     }
   }
 
-  const handleDemoLogin = async (demoEmail: string, demoPassword: string) => {
-    setEmail(demoEmail)
-    setPassword(demoPassword)
-    setError("")
-    setIsLoading(true)
-
-    try {
-      await login(demoEmail, demoPassword)
-      router.push("/")
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed")
-      setIsLoading(false)
-    }
-  }
-
   return (
     <div className="w-full max-w-md">
       <Card className="p-8 border-0 shadow-2xl">
@@ -84,41 +69,7 @@ export default function LoginForm() {
             {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
           </Button>
         </form>
-
-        <div className="mt-6 border-t pt-6">
-          <p className="text-sm text-muted-foreground mb-3">Cuentas demo:</p>
-          <div className="space-y-2">
-            <Button
-              variant="outline"
-              className="w-full text-sm bg-transparent"
-              onClick={() => handleDemoLogin("admin@coworkhub.com", "admin123")}
-              disabled={isLoading}
-            >
-              Admin Ramos
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full text-sm bg-transparent"
-              onClick={() => handleDemoLogin("alex@company.com", "password123")}
-              disabled={isLoading}
-            >
-              Client Ramos (Alex)
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full text-sm bg-transparent"
-              onClick={() => handleDemoLogin("sarah@design.com", "password123")}
-              disabled={isLoading}
-            >
-              Client Ramos (Sarah)
-            </Button>
-          </div>
-        </div>
       </Card>
-
-      <p className="text-center text-xs text-muted-foreground mt-6">
-        Esta es una demostración de aplicación. Use las cuentas demostración para explorar.
-      </p>
     </div>
   )
 }
