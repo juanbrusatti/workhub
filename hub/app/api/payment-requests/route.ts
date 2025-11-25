@@ -35,6 +35,21 @@ export async function POST(request: Request) {
 
     const paymentRequest = await request.json()
 
+    // Validar que no exista una solicitud duplicada para el mismo período (cualquier estado)
+    const existingRequest = await adminDb
+      .collection("payment_requests")
+      .where("period", "==", paymentRequest.period)
+      .where("userId", "==", paymentRequest.userId)
+      .where("clientId", "==", paymentRequest.clientId)
+      .limit(1)
+      .get()
+
+    if (!existingRequest.empty) {
+      return NextResponse.json({ 
+        error: "Ya existe una solicitud de pago para este período. Debes esperar hasta el próximo mes para generar una nueva solicitud." 
+      }, { status: 409 }) // 409 Conflict
+    }
+
     // Guardar la solicitud de pago en Firestore
     const paymentRequestRef = await adminDb.collection("payment_requests").add({
       ...paymentRequest,

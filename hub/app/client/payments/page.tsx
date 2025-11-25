@@ -59,6 +59,10 @@ function PaymentsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   
+  // Estado para control de solicitudes duplicadas
+  const [hasExistingRequest, setHasExistingRequest] = useState(false)
+  const [checkingRequest, setCheckingRequest] = useState(false)
+  
   // Lógica de paginación
   const indexOfLastItem = currentPage * itemsPerPage
   const indexOfFirstItem = indexOfLastItem - itemsPerPage
@@ -69,6 +73,43 @@ function PaymentsPage() {
   useEffect(() => {
     setCurrentPage(1)
   }, [paymentHistory])
+
+  // Verificar si existe solicitud pendiente para el período actual
+  useEffect(() => {
+    const checkExistingRequest = async () => {
+      if (!user || !clientData || !nextPaymentInfo.period) return
+      
+      try {
+        setCheckingRequest(true)
+        const token = await getIdToken()
+        if (!token) return
+
+        const response = await fetch('/api/payment-requests/check-existing', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            period: nextPaymentInfo.period,
+            userId: user.id,
+            clientId: clientData.id 
+          })
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setHasExistingRequest(data.exists)
+        }
+      } catch (error) {
+        console.error('Error checking existing request:', error)
+      } finally {
+        setCheckingRequest(false)
+      }
+    }
+
+    checkExistingRequest()
+  }, [user, clientData, nextPaymentInfo.period, getIdToken])
 
   useEffect(() => {
     // Obtener datos del cliente
@@ -189,7 +230,33 @@ function PaymentsPage() {
       if (historyResponse.ok) {
         const historyData = await historyResponse.json()
         setPaymentHistory(historyData.payments || [])
-        setLoadingHistory(false)      }
+        setLoadingHistory(false)
+      }
+      
+      // Verificar si existe solicitud para el nuevo período
+      if (data && data.nextPaymentPeriod) {
+        try {
+          const checkResponse = await fetch('/api/payment-requests/check-existing', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+              period: data.nextPaymentPeriod,
+              userId: user.id,
+              clientId: data.id 
+            })
+          })
+
+          if (checkResponse.ok) {
+            const checkData = await checkResponse.json()
+            setHasExistingRequest(checkData.exists)
+          }
+        } catch (error) {
+          console.error('Error checking existing request:', error)
+        }
+      }
       
     } catch (err) {
       console.error('Error al refrescar datos:', err)
@@ -332,12 +399,72 @@ function PaymentsPage() {
     window.open(`https://wa.me/5491112345678?text=${message}`, '_blank')
   }
 
+  const checkExistingPaymentRequest = async (period: string, token: string) => {
+    try {
+      console.log('Checking existing request for period:', period)
+      console.log('User ID:', user.id)
+      console.log('Client ID:', clientData.id)
+      
+      const response = await fetch('/api/payment-requests/check-existing', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          period,
+          userId: user.id,
+          clientId: clientData.id 
+        })
+      })
+
+      console.log('Check response status:', response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Check response data:', data)
+        return data.exists // true si existe, false si no
+      } else {
+        console.log('Check response not ok:', response.status)
+        const errorData = await response.json()
+        console.log('Error response:', errorData)
+      }
+      return false // Si hay error, permitimos continuar
+    } catch (error) {
+      console.error('Error checking existing request:', error)
+      return false // Si hay error, permitimos continuar
+    }
+  }
+
   const handleMarkAsPaid = async () => {
     try {
+      console.log('=== handleMarkAsPaid START ===')
+      console.log('Current period:', nextPaymentInfo.period)
+      console.log('User exists:', !!user)
+      console.log('Client data exists:', !!clientData)
+      
       const token = await getIdToken()
       if (!token) {
         throw new Error('No se pudo obtener el token de autenticación')
       }
+
+      console.log('Token obtained successfully')
+
+      // Verificar si ya existe una solicitud para este período
+      const existingRequest = await checkExistingPaymentRequest(nextPaymentInfo.period, token)
+      console.log('Existing request check result:', existingRequest)
+      
+      if (existingRequest) {
+        console.log('Blocking duplicate request')
+        toast({
+          title: "Solicitud duplicada",
+          description: `Ya existe una solicitud de pago para el período ${nextPaymentInfo.period}. Debes esperar hasta el próximo mes para generar una nueva solicitud.`,
+          variant: "destructive"
+        })
+        return
+      }
+
+      console.log('Proceeding with payment request creation...')
 
       const paymentRequest = {
         clientId: clientData.id,
@@ -499,9 +626,33 @@ function PaymentsPage() {
                       <Button
                         className="w-full mt-3 bg-green-600 hover:bg-green-700"
                         onClick={handleMarkAsPaid}
+                        disabled={hasExistingRequest || checkingRequest}
                       >
-                        Marcar como Pagado
+                        {checkingRequest ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                            Verificando...
+                          </>
+                        ) : hasExistingRequest ? (
+                          <>
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Solicitud ya enviada
+                          </>
+                        ) : (
+                          'Marcar como Pagado'
+                        )}
                       </Button>
+
+                      {hasExistingRequest && (
+                        <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm text-yellow-800">
+                            <strong>Atención:</strong> Ya existe una solicitud de pago para el período {nextPaymentInfo.period}. 
+                            Debes esperar hasta el próximo mes para generar una nueva solicitud.
+                          </p>
+                        </div>
+                      )}
 
                       <div className="mt-4 pt-4 border-t">
                         <p className="text-sm text-muted-foreground mb-2">
