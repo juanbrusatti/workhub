@@ -28,6 +28,48 @@ self.addEventListener("activate", (event) => {
     }),
   )
   self.clients.claim()
+  })
+
+  // Push event - display notifications sent from server
+  self.addEventListener("push", (event) => {
+    let payload = {}
+    try {
+      if (event.data) payload = event.data.json()
+    } catch (e) {
+      console.error("Failed to parse push event data", e)
+    }
+
+    const title = payload.title || "Notificación"
+    const options = {
+      body: payload.body || "",
+      icon: payload.icon || "/icon-192x192.png",
+      badge: payload.badge || "/icon-192x192.png",
+      tag: payload.tag || undefined,
+      data: payload.data || {},
+    }
+
+    event.waitUntil(self.registration.showNotification(title, options))
+  })
+
+  // Notification click - focus or open the url included in notification data
+  self.addEventListener("notificationclick", (event) => {
+    event.notification.close()
+    const url = event.notification.data?.url || "/"
+
+    event.waitUntil(
+      clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+        for (let i = 0; i < windowClients.length; i++) {
+          const client = windowClients[i]
+          if (client.url === url && "focus" in client) {
+            return client.focus()
+          }
+        }
+        if (clients.openWindow) {
+          return clients.openWindow(url)
+        }
+      }),
+    )
+  })
 })
 
 // Fetch event - serve from cache, fallback to network

@@ -45,6 +45,60 @@ export async function POST(request: Request) {
     // Actualizar el ID del documento
     await paymentRequestRef.update({ id: paymentRequestRef.id })
 
+    // Enviar notificación a tokens FCM de admins (usar Firebase Cloud Messaging)
+    try {
+      const tokensSnapshot = await adminDb.collection("fcm_tokens").where("role", "==", "admin").get()
+      const tokens = tokensSnapshot.docs.map(d => d.data().token).filter(Boolean) as string[]
+
+      if (tokens.length > 0) {
+        const paymentRequestData = (await paymentRequestRef.get()).data() || {}
+        const userName = paymentRequestData.userName ?? ''
+        const userEmail = paymentRequestData.userEmail ?? ''
+        const amountValue = paymentRequestData.amount ?? ''
+        const planName = paymentRequestData.planName ?? ''
+        const message = {
+          notification: {
+            title: 'Nueva solicitud de pago',
+            body: `${userName} (${userEmail}) solicitó pago de $${amountValue} para ${planName}`,
+          },
+          data: {
+            url: '/admin/payment-requests',
+            requestId: paymentRequestRef.id,
+            userName: String(userName),
+            amount: String(amountValue),
+          },
+        }
+
+        // Enviar a varios tokens
+        const { adminMessaging } = await import('@/lib/firebase-admin')
+        const batchSize = 500
+        for (let i = 0; i < tokens.length; i += batchSize) {
+          const chunk = tokens.slice(i, i + batchSize)
+          const adminSdk = await import('firebase-admin')
+          const response = await (adminSdk.messaging() as any).sendMulticast({
+            tokens: chunk,
+            notification: message.notification,
+            data: message.data,
+          } as any)
+
+          // Manejar tokens inválidos
+          response.responses.forEach((resp: any, idx: number) => {
+            if (!resp.success) {
+              const error = resp.error as any
+              if (error && (error.code === 'messaging/registration-token-not-registered' || error.code === 'messaging/invalid-registration-token')) {
+                const badToken = chunk[idx]
+                adminDb.collection('fcm_tokens').where('token', '==', badToken).get().then(snap => {
+                  snap.forEach(doc => doc.ref.delete().catch(() => {}))
+                }).catch(() => {})
+              }
+            }
+          })
+        }
+      }
+    } catch (err) {
+      console.error('FCM push error:', err)
+    }
+
     return NextResponse.json({ 
       success: true, 
       requestId: paymentRequestRef.id,
