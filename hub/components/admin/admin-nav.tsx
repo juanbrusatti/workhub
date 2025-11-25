@@ -16,13 +16,6 @@ export default function AdminNav({ user, onLogout }: AdminNavProps) {
     <nav className="bg-card border-b sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-destructive rounded-lg flex items-center justify-center text-destructive-foreground font-bold text-lg">
-              A
-            </div>
-            <span className="font-bold text-lg hidden sm:inline">CoWorkHub Admin</span>
-          </div>
-          
           {/* Navegación desktop - mantiene las opciones visibles */}
           <div className="hidden md:flex gap-4">
             <Link href="/admin/dashboard" className="text-sm hover:text-primary">
