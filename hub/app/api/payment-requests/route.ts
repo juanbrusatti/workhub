@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { adminAuth, adminDb } from "@/lib/firebase-admin"
+import { sendPaymentRequestEmail } from "@/lib/email"
 
 interface PaymentRequestData {
   clientId: string
@@ -12,6 +13,7 @@ interface PaymentRequestData {
   dueDate: string
   requestDate: string
   status: 'pending' | 'approved' | 'rejected'
+  receiptImage?: string // Base64 image
   createdAt?: any
 }
 
@@ -44,6 +46,22 @@ export async function POST(request: Request) {
 
     // Actualizar el ID del documento
     await paymentRequestRef.update({ id: paymentRequestRef.id })
+
+    // Enviar notificación por email
+    try {
+      await sendPaymentRequestEmail({
+        userName: paymentRequest.userName,
+        userEmail: paymentRequest.userEmail,
+        amount: paymentRequest.amount,
+        planName: paymentRequest.planName,
+        period: paymentRequest.period,
+        requestDate: paymentRequest.requestDate,
+        receiptImage: paymentRequest.receiptImage
+      })
+    } catch (emailError) {
+      console.error("Error enviando email de notificación:", emailError)
+      // No fallamos la solicitud si el email no se puede enviar
+    }
 
     return NextResponse.json({ 
       success: true, 

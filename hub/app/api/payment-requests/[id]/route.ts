@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { adminAuth, adminDb } from "@/lib/firebase-admin"
+import { sendPaymentApprovalEmail, sendPaymentRejectionEmail } from "@/lib/email"
 
 interface PaymentRequestData {
   clientId: string
@@ -102,6 +103,8 @@ export async function PATCH(
       const clientRef = adminDb.collection("clients").doc(requestData.clientId)
       const clientDoc = await clientRef.get()
       
+      let nextPaymentPeriod = ""
+      
       if (clientDoc.exists) {
         const clientData = clientDoc.data()
         if (!clientData) {
@@ -130,6 +133,8 @@ export async function PATCH(
         const nextMonth = (clientStartMonth + currentPeriod) % 12
         const nextYear = clientStartYear + Math.floor((clientStartMonth + currentPeriod) / 12)
         
+        nextPaymentPeriod = `${nextMonthNames[nextMonth]} ${nextYear}`
+        
         console.log('Calculation details:', {
           currentPeriod,
           clientStartMonth,
@@ -141,16 +146,39 @@ export async function PATCH(
         await clientRef.update({
           currentPeriod: nextPeriod,
           lastPaymentDate: new Date(),
-          nextPaymentPeriod: `${nextMonthNames[nextMonth]} ${nextYear}`,
+          nextPaymentPeriod: nextPaymentPeriod,
           paymentStatus: 'active'
         })
         
-        console.log('Updated client next payment period to:', `${nextMonthNames[nextMonth]} ${nextYear}`)
+        console.log('Updated client next payment period to:', nextPaymentPeriod)
         console.log('Client data after update:', {
           currentPeriod: nextPeriod,
-          nextPaymentPeriod: `${nextMonthNames[nextMonth]} ${nextYear}`,
+          nextPaymentPeriod: nextPaymentPeriod,
           paymentStatus: 'active'
         })
+      }
+
+      // Enviar email de aprobación al cliente
+      try {
+        console.log('Enviando email de aprobación a:', requestData.userEmail)
+        console.log('Variables de entorno email:', {
+          EMAIL_USER: process.env.EMAIL_USER ? 'Configurada' : 'No configurada',
+          EMAIL_PASS: process.env.EMAIL_PASS ? 'Configurada' : 'No configurada'
+        })
+        
+        await sendPaymentApprovalEmail({
+          userName: requestData.userName,
+          userEmail: requestData.userEmail,
+          amount: requestData.amount,
+          planName: requestData.planName,
+          period: requestData.period,
+          nextPaymentPeriod: nextPaymentPeriod
+        })
+        
+        console.log('Email de aprobación enviado exitosamente')
+      } catch (emailError) {
+        console.error("Error enviando email de aprobación:", emailError)
+        // No fallamos la aprobación si el email no se puede enviar
       }
 
       return NextResponse.json({ 
@@ -165,6 +193,25 @@ export async function PATCH(
         processedBy: "admin",
         rejectionReason: reason || "Solicitud rechazada"
       })
+
+      // Enviar email de rechazo al cliente
+      try {
+        console.log('Enviando email de rechazo a:', requestData.userEmail)
+        
+        await sendPaymentRejectionEmail({
+          userName: requestData.userName,
+          userEmail: requestData.userEmail,
+          amount: requestData.amount,
+          planName: requestData.planName,
+          period: requestData.period,
+          rejectionReason: reason || "Solicitud rechazada"
+        })
+        
+        console.log('Email de rechazo enviado exitosamente')
+      } catch (emailError) {
+        console.error("Error enviando email de rechazo:", emailError)
+        // No fallamos el rechazo si el email no se puede enviar
+      }
 
       return NextResponse.json({ 
         success: true, 

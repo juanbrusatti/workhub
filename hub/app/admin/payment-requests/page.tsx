@@ -109,7 +109,9 @@ export default function PaymentRequestsPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Error al procesar la solicitud')
+        const errorText = await response.text()
+        console.error('Error response:', errorText)
+        throw new Error(`Error al procesar la solicitud: ${response.status} - ${errorText}`)
       }
 
       // Actualizar la lista de solicitudes
