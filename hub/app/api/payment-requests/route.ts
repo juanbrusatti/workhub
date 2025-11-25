@@ -47,8 +47,11 @@ export async function POST(request: Request) {
 
     // Enviar notificación a tokens FCM de admins (usar Firebase Cloud Messaging)
     try {
+      console.log('[PAYMENT-FCM] Fetching admin FCM tokens...')
       const tokensSnapshot = await adminDb.collection("fcm_tokens").where("role", "==", "admin").get()
       const tokens = tokensSnapshot.docs.map(d => d.data().token).filter(Boolean) as string[]
+
+      console.log('[PAYMENT-FCM] Found', tokens.length, 'admin tokens')
 
       if (tokens.length > 0) {
         const paymentRequestData = (await paymentRequestRef.get()).data() || {}
@@ -70,16 +73,18 @@ export async function POST(request: Request) {
         }
 
         // Enviar a varios tokens
-        const { adminMessaging } = await import('@/lib/firebase-admin')
+        const adminSdk = await import('firebase-admin')
         const batchSize = 500
         for (let i = 0; i < tokens.length; i += batchSize) {
           const chunk = tokens.slice(i, i + batchSize)
-          const adminSdk = await import('firebase-admin')
+          console.log('[PAYMENT-FCM] Sending to', chunk.length, 'tokens in batch', Math.floor(i / batchSize) + 1)
           const response = await (adminSdk.messaging() as any).sendMulticast({
             tokens: chunk,
             notification: message.notification,
             data: message.data,
           } as any)
+
+          console.log('[PAYMENT-FCM] Batch result - Success:', response.successCount, 'Failure:', response.failureCount)
 
           // Manejar tokens inválidos
           response.responses.forEach((resp: any, idx: number) => {
@@ -87,6 +92,7 @@ export async function POST(request: Request) {
               const error = resp.error as any
               if (error && (error.code === 'messaging/registration-token-not-registered' || error.code === 'messaging/invalid-registration-token')) {
                 const badToken = chunk[idx]
+                console.log('[PAYMENT-FCM] Removing invalid token')
                 adminDb.collection('fcm_tokens').where('token', '==', badToken).get().then(snap => {
                   snap.forEach(doc => doc.ref.delete().catch(() => {}))
                 }).catch(() => {})
@@ -94,9 +100,10 @@ export async function POST(request: Request) {
             }
           })
         }
+        console.log('[PAYMENT-FCM] All notifications sent')
       }
     } catch (err) {
-      console.error('FCM push error:', err)
+      console.error('[PAYMENT-FCM] FCM push error:', err)
     }
 
     return NextResponse.json({ 

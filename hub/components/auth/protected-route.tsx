@@ -35,36 +35,50 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
     const registerFcm = async () => {
       try {
+        console.log('[FCM] Starting FCM registration for admin user')
+        
         if (typeof Notification === 'undefined') {
-          console.log('Notifications API not available')
+          console.error('[FCM] Notifications API not available')
           return
         }
 
         let permission = Notification.permission
+        console.log('[FCM] Current notification permission:', permission)
+        
         if (permission === 'default') {
+          console.log('[FCM] Requesting notification permission...')
           permission = await Notification.requestPermission()
+          console.log('[FCM] Permission result:', permission)
         }
 
         if (permission !== 'granted') {
-          console.log('Notification permission not granted:', permission)
+          console.error('[FCM] Notification permission not granted:', permission)
           return
         }
 
-        console.log('Initializing FCM...')
+        console.log('[FCM] Initializing Firebase messaging...')
         const messaging = getMessaging(firebaseApp)
+        console.log('[FCM] Messaging instance created:', messaging)
+        
         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
+        console.log('[FCM] VAPID key available:', !!vapidKey)
+        
+        console.log('[FCM] Requesting FCM token...')
         const fcmToken = await getToken(messaging, { vapidKey })
+        console.log('[FCM] FCM token received:', fcmToken ? `${fcmToken.substring(0, 50)}...` : 'null')
 
         if (!fcmToken) {
-          console.log('FCM: no token obtained')
+          console.error('[FCM] No FCM token obtained')
           return
         }
 
-        console.log('FCM token obtained:', fcmToken)
-
         const idToken = await getIdToken()
-        if (!idToken) return
+        if (!idToken) {
+          console.error('[FCM] No ID token available')
+          return
+        }
 
+        console.log('[FCM] Sending token to server...')
         const res = await fetch('/api/register-fcm-token', {
           method: 'POST',
           headers: {
@@ -74,9 +88,18 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
           body: JSON.stringify({ token: fcmToken }),
         })
 
-        console.log('register-fcm-token response', res.status, await res.text())
+        const resText = await res.text()
+        console.log('[FCM] Server response status:', res.status)
+        console.log('[FCM] Server response body:', resText)
+        
+        if (!res.ok) {
+          console.error('[FCM] Registration failed:', res.status, resText)
+          return
+        }
+        
+        console.log('[FCM] Registration successful!')
       } catch (err) {
-        console.error('Failed to register FCM token', err)
+        console.error('[FCM] Error during registration:', err)
       }
     }
 
