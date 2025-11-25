@@ -54,7 +54,7 @@ export default function ClientsManagement() {
     email: "", 
     password: "", 
     company: "", 
-    plan: "" 
+    plan: "no-plan" // Inicializar con "no-plan" para que muestre "Sin plan por ahora"
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -178,12 +178,10 @@ export default function ClientsManagement() {
           setPlans(fetchedPlans)
 
           if (fetchedPlans.length > 0) {
-            setNewClient(prev => {
-              const currentPlanExists = fetchedPlans.some(plan => plan.id === prev.plan)
-              return { ...prev, plan: currentPlanExists ? prev.plan : fetchedPlans[0].id }
-            })
-          } else {
-            setNewClient(prev => ({ ...prev, plan: "" }))
+            // No cambiar automáticamente el plan seleccionado si ya está en "no-plan"
+            if (newClient.plan !== "no-plan" && !fetchedPlans.some(plan => plan.id === newClient.plan)) {
+              setNewClient(prev => ({ ...prev, plan: "no-plan" }))
+            }
           }
 
           await fetchClients()
@@ -245,7 +243,7 @@ export default function ClientsManagement() {
           password: newClient.password,
           name: newClient.name,
           companyName: newClient.company,
-          planId: newClient.plan,
+          planId: newClient.plan || null, // Enviar null si no hay plan seleccionado
         }),
       })
 
@@ -256,14 +254,9 @@ export default function ClientsManagement() {
         return
       }
 
-      // Obtener el plan seleccionado
-      const selectedPlan = plans.find(plan => plan.id === newClient.plan)
+      // Obtener el plan seleccionado (si hay uno)
+      const selectedPlan = newClient.plan ? plans.find(plan => plan.id === newClient.plan) : null
       
-      if (!selectedPlan) {
-        throw new Error('No se pudo encontrar el plan seleccionado')
-      }
-      
-
       const newClientEntry = {
         id: payload.uid || payload.id,
         userId: payload.uid || payload.id,
@@ -278,25 +271,25 @@ export default function ClientsManagement() {
         companyName: newClient.company || '',
         plan: selectedPlan,
         subscriptionStartDate: new Date(),
-        subscriptionEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días después
+        subscriptionEndDate: selectedPlan ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null, // Solo si hay plan
         status: "active" as const,
         createdAt: new Date(),
       }
 
       setClients([newClientEntry, ...clients])
       setShowAddForm(false)
-      // Resetear el formulario manteniendo el plan seleccionado
+      // Resetear el formulario
       setNewClient({ 
         name: "", 
         email: "", 
         password: "", 
         company: "", 
-        plan: plans[0]?.id || "" 
+        plan: "no-plan" // Resetear a "no-plan" para que muestre "Sin plan por ahora"
       })
       
       toast({
         title: "Cliente creado",
-        description: `El cliente ${newClient.name} ha sido creado exitosamente`,
+        description: `El cliente ${newClient.name} ha sido creado exitosamente${selectedPlan ? ' con plan asignado' : ' sin plan asignado'}`,
       })
     } catch (error) {
       console.error(error)
@@ -553,15 +546,18 @@ export default function ClientsManagement() {
             </div>
             
             <div>
-              <Label>Plan de pago <span className="text-destructive">*</span></Label>
+              <Label>Plan de pago (opcional)</Label>
               <Select
                 value={newClient.plan}
-                onValueChange={(value) => setNewClient({ ...newClient, plan: value })}
+                onValueChange={(value) => setNewClient({ ...newClient, plan: value === "no-plan" ? "" : value })}
               >
                 <SelectTrigger className="w-full mt-1">
-                  <SelectValue placeholder="Selecciona un plan" />
+                  <SelectValue placeholder="Selecciona un plan (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="no-plan">
+                    <span className="text-muted-foreground">Sin plan por ahora</span>
+                  </SelectItem>
                   {plans.map((plan) => (
                     <SelectItem key={plan.id} value={plan.id}>
                       {plan.name} (${plan.price}/mes)
@@ -569,6 +565,9 @@ export default function ClientsManagement() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Puedes asignar un plan más tarde si lo deseas
+              </p>
             </div>
             {formError && (
               <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-md">
@@ -586,7 +585,7 @@ export default function ClientsManagement() {
               </Button>
               <Button 
                 onClick={handleAddClient} 
-                disabled={isSubmitting || !newClient.plan}
+                disabled={isSubmitting}
                 className="gap-2"
               >
                 {isSubmitting ? (
