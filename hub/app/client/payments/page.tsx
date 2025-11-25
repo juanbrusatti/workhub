@@ -54,6 +54,21 @@ function PaymentsPage() {
   const [paymentHistory, setPaymentHistory] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [nextPaymentInfo, setNextPaymentInfo] = useState(nextPayment)
+  
+  // Estado para paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+  
+  // Lógica de paginación
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentItems = paymentHistory.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(paymentHistory.length / itemsPerPage)
+  
+  // Resetear página cuando cambia el historial
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [paymentHistory])
 
   useEffect(() => {
     // Obtener datos del cliente
@@ -542,8 +557,16 @@ function PaymentsPage() {
         {/* Historial de Pagos */}
         <Card className="p-6 border">
           <h3 className="text-2xl font-bold mb-6">Historial de Pagos</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          
+          {/* Info de paginación en mobile */}
+          {paymentHistory.length > itemsPerPage && (
+            <div className="mb-4 text-sm text-muted-foreground text-center sm:hidden">
+              Página {currentPage} de {totalPages} ({paymentHistory.length} pagos totales)
+            </div>
+          )}
+          
+          <div className="overflow-x-auto -mx-6 px-6">
+            <table className="w-full text-sm min-w-[500px]">
               <thead className="border-b">
                 <tr className="text-muted-foreground">
                   <th className="text-left py-3">Período</th>
@@ -553,7 +576,7 @@ function PaymentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {paymentHistory.map((payment) => (
+                {currentItems.map((payment) => (
                   <tr key={payment.id} className="border-b">
                     <td className="py-3">{payment.period}</td>
                     <td className="py-3">{payment.planName}</td>
@@ -567,7 +590,7 @@ function PaymentsPage() {
                     </td>
                   </tr>
                 ))}
-                {paymentHistory.length === 0 && !loadingHistory && (
+                {currentItems.length === 0 && !loadingHistory && (
                   <tr>
                     <td colSpan={4} className="py-8 text-center text-muted-foreground">
                       No hay pagos registrados
@@ -584,6 +607,77 @@ function PaymentsPage() {
               </tbody>
             </table>
           </div>
+          
+          {/* Controles de paginación */}
+          {paymentHistory.length > itemsPerPage && (
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-sm text-muted-foreground">
+                Mostrando {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, paymentHistory.length)} de {paymentHistory.length} pagos
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span className="hidden sm:inline ml-1">Anterior</span>
+                </Button>
+                
+                {/* Números de página - solo en desktop */}
+                <div className="hidden sm:flex items-center gap-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    // Mostrar páginas inteligentemente: 1, ..., current-1, current, current+1, ..., last
+                    let pageNum
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className="w-8 h-8 p-0 text-sm"
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+                
+                {/* Indicador de página actual en mobile */}
+                <div className="sm:hidden text-sm font-medium px-2">
+                  {currentPage}/{totalPages}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1"
+                >
+                  <span className="hidden sm:inline mr-1">Siguiente</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       </main>
       <Toaster />
