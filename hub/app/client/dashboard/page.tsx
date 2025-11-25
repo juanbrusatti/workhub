@@ -6,6 +6,7 @@ import ClientNav from "@/components/client/client-nav"
 import MembershipCard from "@/components/client/membership-card"
 import ReservationSection from "@/components/client/reservation-section"
 import AnnouncementsSection from "@/components/client/announcements-section"
+import PrintingSection from "@/components/client/printing-section"
 import { useState, useEffect } from "react"
 
 export default function ClientDashboard() {
@@ -109,7 +110,7 @@ export default function ClientDashboard() {
 
         {/* Navigation tabs */}
         <div className="flex gap-4 mb-8 border-b">
-          {["resumen", "reservas", "wifi", "anuncios"].map((tab) => (
+          {["resumen", "reservas", "impresiones", "wifi", "anuncios"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -136,6 +137,8 @@ export default function ClientDashboard() {
         )}
 
         {activeTab === "reservas" && <ReservationSection clientId={clientData?.id || ""} />}
+
+        {activeTab === "impresiones" && <PrintingSection clientId={clientData?.id || ""} />}
 
         {activeTab === "wifi" && (
           <div className="bg-card rounded-lg p-6 border">

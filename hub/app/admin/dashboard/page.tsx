@@ -7,6 +7,7 @@ import DashboardOverview from "@/components/admin/dashboard-overview"
 import ClientsManagement from "@/components/admin/clients-management"
 import PlansManagement from "@/components/admin/plans-management"
 import RoomsManagement from "@/components/admin/rooms-management"
+import PrintingManagement from "@/components/admin/printing-management"
 import AnnouncementsManagement from "@/components/admin/announcements-management"
 import { useState } from "react"
 
@@ -39,6 +40,7 @@ export default function AdminDashboard() {
             { id: "clients", label: "Clientes" },
             { id: "plans", label: "Planes de pago" },
             { id: "rooms", label: "Salas y escritorios" },
+            { id: "printing", label: "Impresiones" },
             { id: "announcements", label: "Anuncios" },
           ].map((tab) => (
             <button
@@ -60,6 +62,7 @@ export default function AdminDashboard() {
         {activeTab === "clients" && <ClientsManagement />}
         {activeTab === "plans" && <PlansManagement />}
         {activeTab === "rooms" && <RoomsManagement />}
+        {activeTab === "printing" && <PrintingManagement />}
         {activeTab === "announcements" && <AnnouncementsManagement />}
       </main>
     </div>
