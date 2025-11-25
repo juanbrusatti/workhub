@@ -30,9 +30,12 @@ type PrintingSettings = {
 export default function PrintingSection({ clientId }: { clientId: string }) {
   const [printRecords, setPrintRecords] = useState<PrintRecord[]>([])
   const [settings, setSettings] = useState<PrintingSettings>({ pricePerSheet: 0 })
-  const [sheets, setSheets] = useState("")
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [sheets, setSheets] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "paid">("all")
+  const recordsPerPage = 5
   const { toast } = useToast()
   const { getIdToken, user } = useAuth()
 
@@ -153,13 +156,30 @@ export default function PrintingSection({ clientId }: { clientId: string }) {
     }
   }
 
+  // Calculate statistics
   const totalPending = printRecords
     .filter(r => r.status === "pending")
     .reduce((sum, r) => sum + r.total_price, 0)
 
   const totalSheets = printRecords
-    .filter(r => r.status === "pending")
     .reduce((sum, r) => sum + r.sheets, 0)
+
+  // Filter records based on status
+  const filteredRecords = printRecords.filter(record => {
+    if (statusFilter === "all") return true
+    return record.status === statusFilter
+  })
+
+  // Pagination
+  const totalPages = Math.ceil(filteredRecords.length / recordsPerPage)
+  const startIndex = (currentPage - 1) * recordsPerPage
+  const endIndex = startIndex + recordsPerPage
+  const currentRecords = filteredRecords.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [statusFilter])
 
   if (loading) {
     return (
@@ -253,52 +273,132 @@ export default function PrintingSection({ clientId }: { clientId: string }) {
         </p>
       </Card>
 
-      {/* Print Records History */}
-      <Card className="p-6 border">
-        <h3 className="text-xl font-bold mb-4">Historial de Impresiones</h3>
-        
-        {printRecords.length === 0 ? (
+      {/* Print Records Section */}
+      <Card className="p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            <h2 className="text-lg font-semibold">Historial de Impresiones</h2>
+          </div>
+          
+          {/* Filter Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <span className="text-sm text-muted-foreground">Filtrar:</span>
+            <div className="flex flex-wrap gap-1">
+              <Button
+                size="sm"
+                variant={statusFilter === "all" ? "default" : "outline"}
+                onClick={() => setStatusFilter("all")}
+              >
+                Todos ({printRecords.length})
+              </Button>
+              <Button
+                size="sm"
+                variant={statusFilter === "pending" ? "default" : "outline"}
+                onClick={() => setStatusFilter("pending")}
+              >
+                Pendientes ({printRecords.filter(r => r.status === "pending").length})
+              </Button>
+              <Button
+                size="sm"
+                variant={statusFilter === "paid" ? "default" : "outline"}
+                onClick={() => setStatusFilter("paid")}
+              >
+                Pagados ({printRecords.filter(r => r.status === "paid").length})
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {currentRecords.length === 0 ? (
           <div className="text-center py-8">
-            <Printer className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No tienes impresiones registradas</p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">
+              {statusFilter === "all" 
+                ? "No hay registros de impresión" 
+                : `No hay registros ${statusFilter === "pending" ? "pendientes" : "pagados"}`
+              }
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
               Usa el formulario de arriba para registrar tu primera impresión
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {printRecords.map((record) => (
-              <div 
-                key={record.id} 
-                className={`p-4 rounded-lg border ${
-                  record.status === "paid" 
-                    ? "bg-green-100 border-green-500" 
-                    : "bg-orange-100 border-orange-500"
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold">{record.sheets} hojas</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(record.date), "dd/MM/yyyy HH:mm")}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">
-                      ${record.total_price.toFixed(2)}
-                    </p>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      record.status === "paid"
-                        ? "bg-green-500 text-white"
-                        : "bg-orange-500 text-white"
-                    }`}>
-                      {record.status === "paid" ? "Pagado" : "Pendiente"}
-                    </span>
+          <>
+            <div className="space-y-3">
+              {currentRecords.map((record) => (
+                <div 
+                  key={record.id} 
+                  className={`p-4 rounded-lg border ${
+                    record.status === "paid" 
+                      ? "bg-green-100 border-green-500" 
+                      : "bg-orange-100 border-orange-500"
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold">{record.sheets} hojas</p>
+                      <p className="text-sm text-muted-foreground">
+                        {format(new Date(record.date), "dd/MM/yyyy HH:mm")}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">
+                        ${record.total_price.toFixed(2)}
+                      </p>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        record.status === "paid"
+                          ? "bg-green-500 text-white"
+                          : "bg-orange-500 text-white"
+                      }`}>
+                        {record.status === "paid" ? "Pagado" : "Pendiente"}
+                      </span>
+                    </div>
                   </div>
                 </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {startIndex + 1} a {Math.min(endIndex, filteredRecords.length)} de {filteredRecords.length} registros
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Anterior
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <Button
+                        key={page}
+                        size="sm"
+                        variant={currentPage === page ? "default" : "outline"}
+                        onClick={() => setCurrentPage(page)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </Card>
     </div>

@@ -7,6 +7,8 @@ import MembershipCard from "@/components/client/membership-card"
 import ReservationSection from "@/components/client/reservation-section"
 import AnnouncementsSection from "@/components/client/announcements-section"
 import PrintingSection from "@/components/client/printing-section"
+import QuickPrintAction from "@/components/client/quick-print-action"
+import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 
 export default function ClientDashboard() {
@@ -98,6 +100,11 @@ export default function ClientDashboard() {
     router.push("/")
   }
 
+  const handleViewPrintingDetails = () => {
+    // Mostrar la vista de impresiones directamente sin cambiar el tab
+    setActiveTab("impresiones")
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <ClientNav user={user} onLogout={handleLogout} />
@@ -110,7 +117,7 @@ export default function ClientDashboard() {
 
         {/* Navigation tabs */}
         <div className="flex gap-4 mb-8 border-b">
-          {["resumen", "reservas", "impresiones", "wifi", "anuncios"].map((tab) => (
+          {["resumen", "reservas", "wifi", "anuncios"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -129,16 +136,15 @@ export default function ClientDashboard() {
         {activeTab === "resumen" && clientData ? (
           <div className="grid gap-6 md:grid-cols-2">
             <MembershipCard plan={clientData.plan} client={clientData} />
+            <QuickPrintAction onViewDetails={handleViewPrintingDetails} />
           </div>
-        ) : (
+        ) : activeTab === "resumen" && !clientData ? (
           <div className="text-center py-8">
             <p className="text-muted-foreground">No se encontraron datos del plan</p>
           </div>
-        )}
+        ) : null}
 
         {activeTab === "reservas" && <ReservationSection clientId={clientData?.id || ""} />}
-
-        {activeTab === "impresiones" && <PrintingSection clientId={clientData?.id || ""} />}
 
         {activeTab === "wifi" && (
           <div className="bg-card rounded-lg p-6 border">
@@ -157,6 +163,15 @@ export default function ClientDashboard() {
         )}
 
         {activeTab === "anuncios" && <AnnouncementsSection />}
+
+        {/* Vista de impresiones (accesible solo desde "Ver detalles") */}
+        {activeTab === "impresiones" && (
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+            </div>
+            <PrintingSection clientId={clientData?.id || ""} />
+          </div>
+        )}
       </main>
     </div>
   )
