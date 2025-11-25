@@ -89,14 +89,14 @@ export async function PUT(request: Request) {
     const { pricePerSheet } = body
     console.log("Extracted pricePerSheet:", pricePerSheet)
 
-    if (!pricePerSheet || typeof pricePerSheet !== "number" || pricePerSheet <= 0) {
+    if (typeof pricePerSheet !== "number" || pricePerSheet < 0) {
       console.log("Validation failed:", { pricePerSheet, type: typeof pricePerSheet })
       return NextResponse.json({ error: "Invalid price per sheet" }, { status: 400 })
     }
 
-    if (pricePerSheet > 100) {
+    if (pricePerSheet > 1000) {
       console.log("Price too high:", pricePerSheet)
-      return NextResponse.json({ error: "Maximum price per sheet is $100" }, { status: 400 })
+      return NextResponse.json({ error: "Maximum price per sheet is $1000" }, { status: 400 })
     }
 
     const supabase = getSupabaseAdminClient()

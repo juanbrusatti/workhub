@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/lib/auth-context"
-import { Loader2, Plus, Printer, FileText } from "lucide-react"
+import { Loader2, Plus, Printer, FileText, CheckCircle } from "lucide-react"
 import { format } from "date-fns"
 
 type PrintRecord = {
@@ -174,34 +174,39 @@ export default function PrintingSection({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="p-6 border">
-          <div className="flex items-center gap-2 mb-2">
-            <FileText className="h-5 w-5 text-blue-600" />
-            <p className="text-sm text-muted-foreground">Hojas pendientes</p>
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-4 bg-orange-500 text-white">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            <div>
+              <p className="text-sm opacity-90">Impresiones Pendientes</p>
+              <p className="text-2xl font-bold">{printRecords.filter(r => r.status === "pending").length}</p>
+              <p className="text-xs opacity-75">Total: ${totalPending.toFixed(2)}</p>
+            </div>
           </div>
-          <p className="text-2xl font-bold text-blue-600">{totalSheets}</p>
         </Card>
-        
-        <Card className="p-6 border">
-          <div className="flex items-center gap-2 mb-2">
-            <Printer className="h-5 w-5 text-green-600" />
-            <p className="text-sm text-muted-foreground">Precio por hoja</p>
+
+        <Card className="p-4 bg-emerald-500 text-white">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5" />
+            <div>
+              <p className="text-sm opacity-90">Impresiones Pagadas</p>
+              <p className="text-2xl font-bold">{printRecords.filter(r => r.status === "paid").length}</p>
+              <p className="text-xs opacity-75">Completadas</p>
+            </div>
           </div>
-          <p className="text-2xl font-bold text-green-600">
-            ${settings.pricePerSheet}
-          </p>
         </Card>
-        
-        <Card className="p-6 border">
-          <div className="flex items-center gap-2 mb-2">
-            <FileText className="h-5 w-5 text-purple-600" />
-            <p className="text-sm text-muted-foreground">Total a pagar</p>
+
+        <Card className="p-4 bg-blue-500 text-white">
+          <div className="flex items-center gap-2">
+            <Printer className="h-5 w-5" />
+            <div>
+              <p className="text-sm opacity-90">Total de Hojas</p>
+              <p className="text-2xl font-bold">{totalSheets}</p>
+              <p className="text-xs opacity-75">Registradas</p>
+            </div>
           </div>
-          <p className="text-2xl font-bold text-purple-600">
-            ${totalPending.toFixed(2)}
-          </p>
         </Card>
       </div>
 
@@ -267,8 +272,8 @@ export default function PrintingSection({ clientId }: { clientId: string }) {
                 key={record.id} 
                 className={`p-4 rounded-lg border ${
                   record.status === "paid" 
-                    ? "bg-green-50 border-green-200 dark:bg-green-950/20" 
-                    : "bg-orange-50 border-orange-200 dark:bg-orange-950/20"
+                    ? "bg-green-100 border-green-500" 
+                    : "bg-orange-100 border-orange-500"
                 }`}
               >
                 <div className="flex justify-between items-start">
@@ -284,8 +289,8 @@ export default function PrintingSection({ clientId }: { clientId: string }) {
                     </p>
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       record.status === "paid"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                        : "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+                        ? "bg-green-500 text-white"
+                        : "bg-orange-500 text-white"
                     }`}>
                       {record.status === "paid" ? "Pagado" : "Pendiente"}
                     </span>
