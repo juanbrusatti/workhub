@@ -8,6 +8,11 @@ interface PaymentRequestEmailData {
   period: string
   requestDate: string
   receiptImage?: string // Base64 image
+  paymentType?: 'membership' | 'printing' | 'both' // Tipo de pago
+  description?: string // Descripción detallada del pago
+  printAmount?: number // Monto de las impresiones
+  printRecords?: string[] // IDs de registros de impresiones
+  printSheets?: number // Cantidad total de hojas
 }
 
 export async function sendPaymentRequestEmail(data: PaymentRequestEmailData) {
@@ -32,14 +37,61 @@ export async function sendPaymentRequestEmail(data: PaymentRequestEmailData) {
       <h2>Nueva Solicitud de Pago</h2>
       <p>Se ha recibido una nueva solicitud de pago con los siguientes detalles:</p>
       
-      <ul>
-        <li><strong>Cliente:</strong> ${data.userName}</li>
-        <li><strong>Email:</strong> ${data.userEmail}</li>
-        <li><strong>Plan:</strong> ${data.planName}</li>
-        <li><strong>Período:</strong> ${data.period}</li>
-        <li><strong>Monto:</strong> ${formattedAmount}</li>
-        <li><strong>Fecha de solicitud:</strong> ${new Date(data.requestDate).toLocaleString('es-AR')}</li>
-      </ul>
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3>👤 Información del Cliente</h3>
+        <ul>
+          <li><strong>Cliente:</strong> ${data.userName}</li>
+          <li><strong>Email:</strong> ${data.userEmail}</li>
+          <li><strong>Fecha de solicitud:</strong> ${new Date(data.requestDate).toLocaleString('es-AR')}</li>
+        </ul>
+      </div>
+      
+      <div style="background-color: #e7f3ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3>💰 Detalles del Pago</h3>
+    `
+
+    // Agregar información específica según el tipo de pago
+    if (data.paymentType === 'printing') {
+      emailContent += `
+        <p><strong>🖨️ Tipo de pago:</strong> Solo Impresiones</p>
+        <ul>
+          <li><strong>Período:</strong> ${data.period}</li>
+          <li><strong>Cantidad de hojas:</strong> ${data.printSheets || 0}</li>
+          <li><strong>Monto de impresiones:</strong> ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(data.printAmount || 0)}</li>
+          <li><strong>Total a pagar:</strong> ${formattedAmount}</li>
+        </ul>
+      `
+    } else if (data.paymentType === 'both') {
+      const membershipAmount = data.amount - (data.printAmount || 0)
+      emailContent += `
+        <p><strong>💰 Tipo de pago:</strong> Mensualidad + Impresiones</p>
+        <ul>
+          <li><strong>Plan:</strong> ${data.planName}</li>
+          <li><strong>Período mensualidad:</strong> ${data.period.replace('Impresiones ', '')}</li>
+          <li><strong>Monto mensualidad:</strong> ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(membershipAmount)}</li>
+          <li><strong>Cantidad de hojas:</strong> ${data.printSheets || 0}</li>
+          <li><strong>Monto de impresiones:</strong> ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(data.printAmount || 0)}</li>
+          <li><strong>Total a pagar:</strong> ${formattedAmount}</li>
+        </ul>
+      `
+    } else {
+      // Pago de mensualidad tradicional
+      emailContent += `
+        <p><strong>📋 Tipo de pago:</strong> Mensualidad</p>
+        <ul>
+          <li><strong>Plan:</strong> ${data.planName}</li>
+          <li><strong>Período:</strong> ${data.period}</li>
+          <li><strong>Monto:</strong> ${formattedAmount}</li>
+        </ul>
+      `
+    }
+
+    emailContent += `
+      </div>
+      
+      <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p><strong>📋 Descripción:</strong> ${data.description || 'Solicitud de pago estándar'}</p>
+      </div>
       
       <p>Por favor, revisa el panel de administración para gestionar esta solicitud.</p>
       
@@ -58,10 +110,18 @@ export async function sendPaymentRequestEmail(data: PaymentRequestEmailData) {
     }
 
     // Preparar las opciones del email
+    let subject = `Nueva Solicitud de Pago - ${data.userName}`
+    
+    if (data.paymentType === 'printing') {
+      subject = `🖨️ Nueva Solicitud de Pago (Impresiones) - ${data.userName}`
+    } else if (data.paymentType === 'both') {
+      subject = `💰 Nueva Solicitud de Pago (Mensualidad + Impresiones) - ${data.userName}`
+    }
+    
     const mailOptions: any = {
       from: process.env.EMAIL_USER,
       to: 'coworkhub25@gmail.com',
-      subject: `Nueva Solicitud de Pago - ${data.userName}`,
+      subject: subject,
       html: emailContent
     }
 

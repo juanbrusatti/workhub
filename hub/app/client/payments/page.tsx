@@ -501,35 +501,9 @@ function PaymentsPage() {
         throw new Error('Error al enviar la solicitud de pago')
       }
 
-      // Si incluye impresiones, marcarlas como pagadas
-      if (includePrintRecords && printRecords.length > 0) {
-        try {
-          const markPaidResponse = await fetch('/api/client/printing/mark-batch-paid', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              recordIds: printRecords.map(record => record.id)
-            })
-          })
-
-          if (markPaidResponse.ok) {
-            console.log('Impresiones marcadas como pagadas correctamente')
-            // Refrescar los datos de impresiones
-            await fetchPendingPrintRecords()
-          } else {
-            console.error('Error al marcar impresiones como pagadas')
-          }
-        } catch (printError) {
-          console.error('Error al procesar impresiones:', printError)
-        }
-      }
-
       toast({
         title: "Solicitud enviada",
-        description: `Tu solicitud de pago${includePrintRecords ? ' y marcado de impresiones' : ''} ha sido enviada al administrador`,
+        description: "Tu solicitud de pago ha sido enviada al administrador para su revisión",
       })
       
       // Limpiar el formulario
