@@ -14,6 +14,11 @@ interface PaymentRequestData {
   requestDate: string
   status: 'pending' | 'approved' | 'rejected'
   createdAt?: any
+  paymentType?: 'membership' | 'printing' | 'both'
+  description?: string
+  printRecords?: string[]
+  printAmount?: number
+  membershipAmount?: number
 }
 
 const unauthorizedResponse = NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -85,6 +90,31 @@ export async function PATCH(
         processedBy: "admin"
       })
 
+      // Si el pago incluye impresiones, marcarlas como pagadas
+      if (requestData.printRecords && requestData.printRecords.length > 0) {
+        try {
+          const { getSupabaseAdminClient } = await import('@/lib/supabase')
+          const supabase = getSupabaseAdminClient()
+          
+          const { data: updatedRecords, error } = await supabase
+            .from('print_records')
+            .update({ 
+              status: 'paid',
+              updated_at: new Date().toISOString()
+            })
+            .in('id', requestData.printRecords)
+            .select()
+          
+          if (!error && updatedRecords) {
+            console.log(`${updatedRecords.length} impresiones marcadas como pagadas correctamente`)
+          } else {
+            console.error('Error al marcar impresiones como pagadas:', error)
+          }
+        } catch (printError) {
+          console.error('Error procesando impresiones:', printError)
+        }
+      }
+
       // Agregar al historial de pagos del cliente
       await adminDb.collection("payment_history").add({
         clientId: requestData.clientId,
@@ -96,7 +126,11 @@ export async function PATCH(
         transactionId: `TXN-${Date.now()}`,
         paymentDate: new Date(),
         approvedAt: new Date(),
-        requestId: id
+        requestId: id,
+        paymentType: requestData.paymentType,
+        description: requestData.description,
+        printAmount: requestData.printAmount,
+        membershipAmount: requestData.membershipAmount
       })
 
       // Actualizar el próximo período de pago del cliente

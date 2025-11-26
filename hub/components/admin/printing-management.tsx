@@ -416,8 +416,8 @@ export default function PrintingManagement() {
                       : "bg-orange-100 border-orange-500"
                   }`}
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                    <div className="flex-1">
                       <p className="font-semibold">{record.client_name}</p>
                       <p className="text-sm text-muted-foreground">{record.client_email}</p>
                       <p className="text-sm">{record.sheets} hojas</p>
@@ -425,12 +425,12 @@ export default function PrintingManagement() {
                         {format(new Date(record.date), "dd/MM/yyyy HH:mm")}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right sm:min-w-0">
                       <p className="font-semibold">
                         ${record.total_price.toFixed(2)}
                       </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs px-2 py-1 rounded-full ${
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
+                        <span className={`text-xs text-center px-2 py-1 rounded-full ${
                           record.status === "paid"
                             ? "bg-green-500 text-white"
                             : "bg-orange-500 text-white"
@@ -443,17 +443,19 @@ export default function PrintingManagement() {
                             variant="outline"
                             onClick={() => handleMarkAsPaid(record.id)}
                             disabled={markingPaid === record.id}
-                            className="gap-1"
+                            className="gap-1 flex-shrink-0"
                           >
                             {markingPaid === record.id ? (
                               <>
                                 <Loader2 className="h-3 w-3 animate-spin" />
-                                Procesando...
+                                <span className="hidden sm:inline">Procesando...</span>
+                                <span className="sm:hidden">...</span>
                               </>
                             ) : (
                               <>
                                 <CheckCircle className="h-3 w-3" />
-                                Marcar pagado
+                                <span className="hidden sm:inline">Marcar como pagado</span>
+                                <span className="sm:hidden">Marcar como pagado</span>
                               </>
                             )}
                           </Button>
