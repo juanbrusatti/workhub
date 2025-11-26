@@ -9,6 +9,8 @@ import AnnouncementsSection from "@/components/client/announcements-section"
 import PrintingSection from "@/components/client/printing-section"
 import QuickPrintAction from "@/components/client/quick-print-action"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Eye, EyeOff, Wifi } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export default function ClientDashboard() {
@@ -18,6 +20,7 @@ export default function ClientDashboard() {
   const [clientData, setClientData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showPasswords, setShowPasswords] = useState<{ [key: string]: boolean }>({})
 
   useEffect(() => {
     // Register service worker
@@ -105,6 +108,13 @@ export default function ClientDashboard() {
     setActiveTab("impresiones")
   }
 
+  const togglePasswordVisibility = (networkId: string) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [networkId]: !prev[networkId]
+    }))
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <ClientNav user={user} onLogout={handleLogout} />
@@ -147,18 +157,92 @@ export default function ClientDashboard() {
         {activeTab === "reservas" && <ReservationSection clientId={clientData?.id || ""} />}
 
         {activeTab === "wifi" && (
-          <div className="bg-card rounded-lg p-6 border">
-            <h2 className="text-2xl font-bold mb-4">Acceso WiFi</h2>
-            <div className="space-y-4">
-              <div className="p-4 bg-secondary/20 rounded-lg">
-                <p className="text-sm text-muted-foreground">Nombre de la red</p>
-                <p className="font-mono text-lg">RamosGenerales-5GHz</p>
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold">Acceso WiFi</h2>
+            
+            {/* Red OficinaAlvear */}
+            <Card className="p-6 border-2 border-primary/20">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <Wifi className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">OficinaAlvear</h3>
+                  </div>
+                </div>
               </div>
-              <div className="p-4 bg-secondary/20 rounded-lg">
-                <p className="text-sm text-muted-foreground">Contraseña</p>
-                <p className="font-mono text-lg">Ramos1234!</p>
+              
+              <div className="space-y-3">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Nombre de red</p>
+                  <p className="font-mono text-sm">OficinaAlvear</p>
+                </div>
+                
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Contraseña</p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-mono text-sm">
+                      {showPasswords.oficinaAlvear ? 'Alvear1147' : '••••••••'}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => togglePasswordVisibility('oficinaAlvear')}
+                      className="h-8 w-8 p-0"
+                    >
+                      {showPasswords.oficinaAlvear ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
+            </Card>
+
+            {/* Red Copada */}
+            <Card className="p-6 border-2 border-primary/20">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <Wifi className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Red Copada</h3>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Nombre de red</p>
+                  <p className="font-mono text-sm">Red Copada</p>
+                </div>
+                
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Contraseña</p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-mono text-sm">
+                      {showPasswords.redCopada ? 'londonlondon' : '••••••••••••'}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => togglePasswordVisibility('redCopada')}
+                      className="h-8 w-8 p-0"
+                    >
+                      {showPasswords.redCopada ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
           </div>
         )}
 
