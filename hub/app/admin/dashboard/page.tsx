@@ -6,7 +6,6 @@ import AdminNav from "@/components/admin/admin-nav"
 import DashboardOverview from "@/components/admin/dashboard-overview"
 import ClientsManagement from "@/components/admin/clients-management"
 import PlansManagement from "@/components/admin/plans-management"
-import RoomsManagement from "@/components/admin/rooms-management"
 import PrintingManagement from "@/components/admin/printing-management"
 import AnnouncementsManagement from "@/components/admin/announcements-management"
 import { useState } from "react"
@@ -30,7 +29,7 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-2">Manage your coworking space</p>
+          <p className="text-muted-foreground mt-2">Gestiona tu coworking</p>
         </div>
 
         {/* Navigation tabs */}
@@ -39,7 +38,6 @@ export default function AdminDashboard() {
             { id: "overview", label: "General" },
             { id: "clients", label: "Clientes" },
             { id: "plans", label: "Planes de pago" },
-            { id: "rooms", label: "Salas y escritorios" },
             { id: "printing", label: "Impresiones" },
             { id: "announcements", label: "Anuncios" },
           ].map((tab) => (
@@ -61,7 +59,6 @@ export default function AdminDashboard() {
         {activeTab === "overview" && <DashboardOverview />}
         {activeTab === "clients" && <ClientsManagement />}
         {activeTab === "plans" && <PlansManagement />}
-        {activeTab === "rooms" && <RoomsManagement />}
         {activeTab === "printing" && <PrintingManagement />}
         {activeTab === "announcements" && <AnnouncementsManagement />}
       </main>

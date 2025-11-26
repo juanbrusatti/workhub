@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     // Actualizar todos los registros de impresión como pagados
     const { data, error } = await supabase
-      .from('print_records')
+      .from('printing_records')
       .update({ 
         status: 'paid',
         updated_at: new Date().toISOString()

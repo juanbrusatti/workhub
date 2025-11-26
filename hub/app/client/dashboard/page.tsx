@@ -9,6 +9,8 @@ import AnnouncementsSection from "@/components/client/announcements-section"
 import PrintingSection from "@/components/client/printing-section"
 import QuickPrintAction from "@/components/client/quick-print-action"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Eye, EyeOff, Wifi } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export default function ClientDashboard() {
@@ -18,6 +20,7 @@ export default function ClientDashboard() {
   const [clientData, setClientData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showPasswords, setShowPasswords] = useState<{ [key: string]: boolean }>({})
 
   useEffect(() => {
     // Register service worker
@@ -105,6 +108,13 @@ export default function ClientDashboard() {
     setActiveTab("impresiones")
   }
 
+  const togglePasswordVisibility = (networkId: string) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [networkId]: !prev[networkId]
+    }))
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <ClientNav user={user} onLogout={handleLogout} />
@@ -147,16 +157,129 @@ export default function ClientDashboard() {
         {activeTab === "reservas" && <ReservationSection clientId={clientData?.id || ""} />}
 
         {activeTab === "wifi" && (
-          <div className="bg-card rounded-lg p-6 border">
-            <h2 className="text-2xl font-bold mb-4">Acceso WiFi</h2>
-            <div className="space-y-4">
-              <div className="p-4 bg-secondary/20 rounded-lg">
-                <p className="text-sm text-muted-foreground">Nombre de la red</p>
-                <p className="font-mono text-lg">RamosGenerales-5GHz</p>
+          <div className="p-8 -mx-8 -my-8">
+            <div className="relative z-10">
+              {/* Título elegante */}
+              <div className="text-center mb-12">
+                <h2 className="text-4xl font-bold text-gray-900 mb-4">
+                  Acceso WiFi
+                </h2>
+                <p className="text-gray-600 text-lg">Conéctate a nuestras redes de alta velocidad</p>
               </div>
-              <div className="p-4 bg-secondary/20 rounded-lg">
-                <p className="text-sm text-muted-foreground">Contraseña</p>
-                <p className="font-mono text-lg">Ramos1234!</p>
+
+              {/* Contenedor de redes */}
+              <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                
+                {/* Red OficinaAlvear - Estilo elegante azul */}
+                <div className="group relative">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl blur opacity-0 group-hover:opacity-20 transition duration-300"></div>
+                  <div className="relative bg-white rounded-2xl shadow-lg border border-gray-200 p-8 transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
+                    
+                    {/* Icono WiFi elegante */}
+                    <div className="flex justify-center mb-6">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-blue-100 rounded-full blur-xl opacity-50"></div>
+                        <div className="relative w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
+                          <Wifi className="w-8 h-8 text-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-center mb-6">
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">OficinaAlvear</h3>
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        <p className="text-gray-500 text-xs mb-2 font-medium uppercase tracking-wider">Nombre de Red</p>
+                        <p className="text-gray-900 font-mono text-lg">OficinaAlvear</p>
+                      </div>
+                      
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        <p className="text-gray-500 text-xs mb-2 font-medium uppercase tracking-wider">Contraseña</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-gray-900 font-mono text-lg">
+                            {showPasswords.oficinaAlvear ? 'Alvear1147' : '••••••••'}
+                          </p>
+                          <button
+                            onClick={() => togglePasswordVisibility('oficinaAlvear')}
+                            className="ml-4 p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-all duration-200 hover:scale-105"
+                          >
+                            {showPasswords.oficinaAlvear ? (
+                              <EyeOff className="w-5 h-5" />
+                            ) : (
+                              <Eye className="w-5 h-5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Red Copada - Estilo elegante morado */}
+                <div className="group relative">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl blur opacity-0 group-hover:opacity-20 transition duration-300"></div>
+                  <div className="relative bg-white rounded-2xl shadow-lg border border-gray-200 p-8 transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
+                    
+                    {/* Icono WiFi elegante */}
+                    <div className="flex justify-center mb-6">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-purple-100 rounded-full blur-xl opacity-50"></div>
+                        <div className="relative w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
+                          <Wifi className="w-8 h-8 text-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-center mb-6">
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Red Copada</h3>
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        <p className="text-gray-500 text-xs mb-2 font-medium uppercase tracking-wider">Nombre de Red</p>
+                        <p className="text-gray-900 font-mono text-lg">Red Copada</p>
+                      </div>
+                      
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        <p className="text-gray-500 text-xs mb-2 font-medium uppercase tracking-wider">Contraseña</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-gray-900 font-mono text-lg">
+                            {showPasswords.redCopada ? 'londonlondon' : '••••••••••••'}
+                          </p>
+                          <button
+                            onClick={() => togglePasswordVisibility('redCopada')}
+                            className="ml-4 p-2 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-lg transition-all duration-200 hover:scale-105"
+                          >
+                            {showPasswords.redCopada ? (
+                              <EyeOff className="w-5 h-5" />
+                            ) : (
+                              <Eye className="w-5 h-5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Texto inferior elegante */}
+              <div className="text-center mt-12">
+                <div className="inline-flex items-center gap-3 px-6 py-3 bg-white/80 backdrop-blur-sm rounded-full border border-gray-200 shadow-sm">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-gray-700 font-medium">
+                    Conexión estable y segura
+                  </span>
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                </div>
               </div>
             </div>
           </div>
