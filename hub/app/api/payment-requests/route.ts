@@ -63,7 +63,7 @@ export async function POST(request: Request) {
           const supabase = getSupabaseAdminClient()
           
           const { data: printRecordsData, error } = await supabase
-            .from('print_records')
+            .from('printing_records')
             .select('sheets')
             .in('id', paymentRequest.printRecords)
           

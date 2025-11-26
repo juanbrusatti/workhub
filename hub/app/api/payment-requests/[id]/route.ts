@@ -97,7 +97,7 @@ export async function PATCH(
           const supabase = getSupabaseAdminClient()
           
           const { data: updatedRecords, error } = await supabase
-            .from('print_records')
+            .from('printing_records')
             .update({ 
               status: 'paid',
               updated_at: new Date().toISOString()

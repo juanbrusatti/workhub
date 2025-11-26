@@ -107,6 +107,27 @@ export async function DELETE(
     // Ejecutar todas las eliminaciones en batch
     await batch.commit()
 
+    // 5. Eliminar registros de impresiones de Supabase
+    try {
+      const { getSupabaseAdminClient } = await import('@/lib/supabase')
+      const supabase = getSupabaseAdminClient()
+      
+      // Eliminar todos los registros de impresiones del cliente
+      const { data: deletedRecords, error: printError } = await supabase
+        .from('printing_records')
+        .delete()
+        .eq('client_id', clientId)
+        .select()
+      
+      if (!printError) {
+        console.log(`Eliminados ${deletedRecords?.length || 0} registros de impresiones del cliente ${clientId}`)
+      } else {
+        console.error('Error eliminando registros de impresiones:', printError)
+      }
+    } catch (supabaseError) {
+      console.error('Error conectando a Supabase para eliminar impresiones:', supabaseError)
+    }
+
     console.log(`Cliente ${clientId} y todos sus datos relacionados han sido eliminados`)
 
     return NextResponse.json({ 
