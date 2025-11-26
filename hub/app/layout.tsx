@@ -2,6 +2,7 @@ import type React from "react"
 import { AuthProvider } from "@/lib/auth-context"
 import { NotificationProvider } from "@/lib/notification-context"
 import NotificationCenter from "@/components/notification-center"
+import CacheCleanerProvider from "@/components/common/cache-cleaner-provider"
 import "./globals.css"
 import { Analytics } from "@vercel/analytics/next"
 import type { Metadata, Viewport } from "next"
@@ -51,8 +52,10 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <AuthProvider>
           <NotificationProvider>
-            {children}
-            <NotificationCenter />
+            <CacheCleanerProvider>
+              {children}
+              <NotificationCenter />
+            </CacheCleanerProvider>
           </NotificationProvider>
         </AuthProvider>
         <Analytics />
