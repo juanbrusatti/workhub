@@ -24,9 +24,6 @@ export default function AdminNav({ user, onLogout }: AdminNavProps) {
             <Link href="/admin/payment-requests" className="text-sm hover:text-primary">
               Solicitudes de Pago
             </Link>
-            <Link href="/admin/payments" className="text-sm hover:text-primary">
-              Payments
-            </Link>
           </div>
 
           {/* Menú General para móvil */}
@@ -47,11 +44,6 @@ export default function AdminNav({ user, onLogout }: AdminNavProps) {
                 <DropdownMenuItem asChild>
                   <Link href="/admin/payment-requests" className="w-full">
                     Solicitudes de Pago
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/payments" className="w-full">
-                    Payments
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
