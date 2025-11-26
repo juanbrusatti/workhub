@@ -22,6 +22,9 @@ function PaymentsPage() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [printRecords, setPrintRecords] = useState<any[]>([])
+  const [loadingPrintRecords, setLoadingPrintRecords] = useState(false)
+  const [paymentType, setPaymentType] = useState<'membership' | 'printing' | 'both'>('membership')
 
   // Calcular próximo período de pago
   const getNextPaymentPeriod = () => {
@@ -135,6 +138,7 @@ function PaymentsPage() {
 
     if (user) {
       fetchClientData()
+      fetchPendingPrintRecords()
     }
   }, [user, getIdToken])
 
@@ -199,6 +203,52 @@ function PaymentsPage() {
     }
   }
 
+  // Función para obtener impresiones pendientes del mes actual
+  const fetchPendingPrintRecords = async () => {
+    try {
+      setLoadingPrintRecords(true)
+      const token = await getIdToken()
+      if (!token) return
+
+      const response = await fetch(`/api/client/printing/records-supabase`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        const records = data.records || []
+        
+        // Filtrar solo las impresiones pendientes del mes actual
+        const now = new Date()
+        const currentMonth = now.getMonth()
+        const currentYear = now.getFullYear()
+        
+        const pendingRecords = records.filter((record: any) => {
+          if (record.status !== 'pending') return false
+          
+          const recordDate = new Date(record.date)
+          return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear
+        })
+        
+        setPrintRecords(pendingRecords)
+        console.log('Impresiones pendientes del mes:', pendingRecords)
+      }
+    } catch (error) {
+      console.error("Error fetching print records:", error)
+    } finally {
+      setLoadingPrintRecords(false)
+    }
+  }
+
+  // Calcular totales de impresiones pendientes
+  const calculatePendingPrintingTotal = () => {
+    return printRecords.reduce((sum, record) => sum + record.total_price, 0)
+  }
+
+  const calculatePendingPrintingSheets = () => {
+    return printRecords.reduce((sum, record) => sum + record.sheets, 0)
+  }
+
   useEffect(() => {
     // Obtener datos del cliente
     const fetchClientData = async () => {
@@ -261,6 +311,7 @@ function PaymentsPage() {
 
     if (user) {
       fetchClientData()
+      fetchPendingPrintRecords()
     }
   }, [user, getIdToken])
 
@@ -400,18 +451,41 @@ function PaymentsPage() {
         reader.readAsDataURL(receiptFile)
       })
 
+      // Calcular montos según el tipo de pago
+      let amount = 0
+      let description = ''
+      let includePrintRecords = false
+
+      if (paymentType === 'membership') {
+        amount = (clientData.plan as any).price
+        description = `Mensualidad - ${clientData.plan.name}`
+      } else if (paymentType === 'printing') {
+        amount = calculatePendingPrintingTotal()
+        description = `Impresiones pendientes - ${calculatePendingPrintingSheets()} hojas`
+        includePrintRecords = true
+      } else if (paymentType === 'both') {
+        amount = ((clientData.plan as any).price || 0) + calculatePendingPrintingTotal()
+        description = `Mensualidad + Impresiones - ${clientData.plan.name} + ${calculatePendingPrintingSheets()} hojas`
+        includePrintRecords = true
+      }
+
       const paymentRequest = {
         clientId: clientData.id,
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
-        amount: (clientData.plan as any).price,
+        amount: amount,
         planName: clientData.plan.name,
-        period: nextPaymentInfo.period,
+        period: paymentType === 'printing' ? 'Impresiones ' + new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }) : nextPaymentInfo.period,
         dueDate: nextPaymentInfo.dueDate,
         requestDate: new Date().toISOString(),
         status: 'pending',
-        receiptImage: receiptBase64 // Agregar el comprobante en base64
+        receiptImage: receiptBase64,
+        paymentType: paymentType, // Agregar el tipo de pago
+        description: description, // Agregar descripción detallada
+        printRecords: includePrintRecords ? printRecords.map(record => record.id) : [], // Incluir IDs de impresiones si aplica
+        printAmount: includePrintRecords ? calculatePendingPrintingTotal() : 0, // Monto de impresiones
+        membershipAmount: paymentType !== 'printing' ? (clientData.plan as any).price || 0 : 0 // Monto de mensualidad
       }
 
       const response = await fetch('/api/payment-requests', {
@@ -427,14 +501,45 @@ function PaymentsPage() {
         throw new Error('Error al enviar la solicitud de pago')
       }
 
+      // Si incluye impresiones, marcarlas como pagadas
+      if (includePrintRecords && printRecords.length > 0) {
+        try {
+          const markPaidResponse = await fetch('/api/client/printing/mark-batch-paid', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              recordIds: printRecords.map(record => record.id)
+            })
+          })
+
+          if (markPaidResponse.ok) {
+            console.log('Impresiones marcadas como pagadas correctamente')
+            // Refrescar los datos de impresiones
+            await fetchPendingPrintRecords()
+          } else {
+            console.error('Error al marcar impresiones como pagadas')
+          }
+        } catch (printError) {
+          console.error('Error al procesar impresiones:', printError)
+        }
+      }
+
       toast({
         title: "Solicitud enviada",
-        description: "Tu solicitud de pago con comprobante ha sido enviada al administrador",
+        description: `Tu solicitud de pago${includePrintRecords ? ' y marcado de impresiones' : ''} ha sido enviada al administrador`,
       })
       
       // Limpiar el formulario
       clearReceipt()
       setShowTransferModal(false)
+      setPaymentType('membership')
+      
+      // Refrescar datos del cliente
+      await refreshClientData()
+      
     } catch (error) {
       toast({
         title: "Error",
@@ -456,7 +561,7 @@ function PaymentsPage() {
           <p className="text-muted-foreground mt-2">Gestiona tu suscripción y historial de pagos</p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 mb-8">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
           {/* Detalles del Plan Actual */}
           <Card className="p-6 border-2 border-primary/20">
             <div className="flex items-center justify-between mb-4">
@@ -501,143 +606,6 @@ function PaymentsPage() {
                 >
                   Pagar Ahora
                 </Button>
-
-                {/* Modal de Transferencia */}
-                {showTransferModal && (
-                  <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 border-2 border-gray-300 shadow-2xl max-h-[90vh] overflow-y-auto">
-                      <h3 className="text-xl font-bold mb-4">Pagar por Transferencia</h3>
-                      
-                      <div className="space-y-4 mb-6">
-                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <p className="text-sm font-medium text-blue-800 mb-2">Datos para la transferencia:</p>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-600">Alias:</span>
-                              <span className="font-mono text-sm">RamosGenerales.mp</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-600">CBU/CVU:</span>
-                              <span className="font-mono text-xs">00000031000000000000000</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-600">Titular:</span>
-                              <span className="text-sm">Ramos Generales S.A.</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-600">CUIT:</span>
-                              <span className="text-sm">30-12345678-9</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <p className="text-sm font-medium text-yellow-800 mb-1">Importe a transferir:</p>
-                          <p className="text-2xl font-bold text-yellow-800">
-                            ${(clientData.plan as any).price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                          </p>
-                          <p className="text-xs text-yellow-700 mt-1">Referencia: {nextPaymentInfo.period}</p>
-                        </div>
-
-                        {/* Campo de carga de comprobante */}
-                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                          <p className="text-sm font-medium text-green-800 mb-3">📸 Adjuntar comprobante de pago:</p>
-                          
-                          {!receiptPreview ? (
-                            <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center">
-                              <input
-                                type="file"
-                                id="receipt"
-                                accept="image/*"
-                                onChange={handleReceiptChange}
-                                className="hidden"
-                              />
-                              <label
-                                htmlFor="receipt"
-                                className="cursor-pointer block"
-                              >
-                                <div className="text-green-600 mb-2">
-                                  <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                  </svg>
-                                </div>
-                                <p className="text-sm text-green-700 font-medium">Hacer clic para subir comprobante</p>
-                                <p className="text-xs text-green-600 mt-1">JPG, PNG - Máximo 5MB</p>
-                              </label>
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
-                              <div className="relative">
-                                <img
-                                  src={receiptPreview}
-                                  alt="Vista previa del comprobante"
-                                  className="w-full h-48 object-cover rounded-lg border"
-                                />
-                                <button
-                                  onClick={clearReceipt}
-                                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>
-                              </div>
-                              <p className="text-sm text-green-700 font-medium text-center">✅ Comprobante cargado</p>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="text-center">
-                          <p className="text-sm text-muted-foreground mb-2">Período de pago</p>
-                          <p className="font-semibold">Del 1 al 10 de cada mes</p>
-                          <p className="text-xs text-muted-foreground mt-1">Vence el {nextPaymentInfo.dueDate}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-3">
-                        <Button
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => {
-                            setShowTransferModal(false)
-                            clearReceipt()
-                          }}
-                          disabled={uploading}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          className="flex-1"
-                          onClick={handleCopyAlias}
-                          disabled={uploading}
-                        >
-                          Copiar Alias
-                        </Button>
-                      </div>
-
-                      <Button
-                        className="w-full mt-3 bg-green-600 hover:bg-green-700"
-                        onClick={handleMarkAsPaid}
-                        disabled={uploading || !receiptFile}
-                      >
-                        {uploading ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                            Enviando...
-                          </>
-                        ) : (
-                          'Enviar Solicitud con Comprobante'
-                        )}
-                      </Button>
-
-                      {!receiptFile && (
-                        <p className="text-xs text-amber-600 text-center mt-2">
-                          ⚠️ Debes adjuntar el comprobante para continuar
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
               </>
             ) : (
               <p className="text-muted-foreground">No hay plan asignado</p>
@@ -649,6 +617,74 @@ function PaymentsPage() {
             >
               Volver al Dashboard
             </Button>
+          </Card>
+
+          {/* Impresiones Pendientes */}
+          <Card className="p-6 border border-orange-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold">Impresiones Pendientes</h3>
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+            </div>
+            
+            {loadingPrintRecords ? (
+              <div className="flex items-center justify-center h-20">
+                <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : printRecords.length > 0 ? (
+              <>
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">Hojas pendientes</span>
+                    <span className="text-2xl font-bold text-orange-600">{calculatePendingPrintingSheets()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Total a pagar</span>
+                    <span className="text-2xl font-bold text-orange-600">
+                      ${calculatePendingPrintingTotal().toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 mb-4 max-h-32 overflow-y-auto">
+                  {printRecords.slice(0, 3).map((record) => (
+                    <div key={record.id} className="text-xs p-2 bg-orange-50 rounded">
+                      <div className="flex justify-between">
+                        <span>{record.sheets} hojas</span>
+                        <span className="font-medium">${record.total_price.toFixed(2)}</span>
+                      </div>
+                      <span className="text-muted-foreground">
+                        {new Date(record.date).toLocaleDateString('es-AR')}
+                      </span>
+                    </div>
+                  ))}
+                  {printRecords.length > 3 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      +{printRecords.length - 3} impresiones más...
+                    </p>
+                  )}
+                </div>
+
+                <Button 
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => {
+                    setPaymentType('printing')
+                    setShowTransferModal(true)
+                  }}
+                >
+                  Pagar Impresiones
+                </Button>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <p className="text-sm text-muted-foreground">No tienes impresiones pendientes</p>
+              </div>
+            )}
           </Card>
 
           {/* Próximo Pago */}
@@ -670,9 +706,268 @@ function PaymentsPage() {
                 <p className="text-sm text-muted-foreground mb-2">Período de pago</p>
                 <p className="font-semibold">Del 1 al 10 de cada mes</p>
               </div>
+
+              {printRecords.length > 0 && (
+                <Button 
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  onClick={() => {
+                    setPaymentType('both')
+                    setShowTransferModal(true)
+                  }}
+                >
+                  Pagar Todo (${(((clientData?.plan as any)?.price || 0) + calculatePendingPrintingTotal()).toLocaleString('es-AR')})
+                </Button>
+              )}
             </div>
           </Card>
         </div>
+
+        {/* Modal de Pago Mejorado */}
+        {showTransferModal && (
+          <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 border-2 border-gray-300 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <h3 className="text-xl font-bold mb-4">Opciones de Pago</h3>
+              
+              {/* Opciones de pago */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <Button
+                  variant={paymentType === 'membership' ? 'default' : 'outline'}
+                  onClick={() => setPaymentType('membership')}
+                  className="flex flex-col items-center p-4 h-auto"
+                >
+                  <div className="text-2xl mb-2">📋</div>
+                  <div className="text-sm font-medium">Mensualidad</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    ${(clientData?.plan as any)?.price || 0}
+                  </div>
+                </Button>
+
+                <Button
+                  variant={paymentType === 'printing' ? 'default' : 'outline'}
+                  onClick={() => setPaymentType('printing')}
+                  className="flex flex-col items-center p-4 h-auto"
+                  disabled={printRecords.length === 0}
+                >
+                  <div className="text-2xl mb-2">🖨️</div>
+                  <div className="text-sm font-medium">Impresiones</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    ${calculatePendingPrintingTotal()}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    ({calculatePendingPrintingSheets()} hojas)
+                  </div>
+                </Button>
+
+                <Button
+                  variant={paymentType === 'both' ? 'default' : 'outline'}
+                  onClick={() => setPaymentType('both')}
+                  className="flex flex-col items-center p-4 h-auto"
+                  disabled={printRecords.length === 0}
+                >
+                  <div className="text-2xl mb-2">💰</div>
+                  <div className="text-sm font-medium">Todo Junto</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    ${((clientData?.plan as any)?.price || 0) + calculatePendingPrintingTotal()}
+                  </div>
+                </Button>
+              </div>
+
+              {/* Detalle del pago seleccionado */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold mb-3">Detalle del pago:</h4>
+                <div className="space-y-2">
+                  {paymentType === 'membership' && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Mensualidad - {clientData?.plan?.name}</span>
+                        <span className="font-medium">${(clientData?.plan as any)?.price || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Período</span>
+                        <span>{nextPaymentInfo.period}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {paymentType === 'printing' && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Impresiones pendientes</span>
+                        <span className="font-medium">${calculatePendingPrintingTotal()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Cantidad de hojas</span>
+                        <span>{calculatePendingPrintingSheets()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Período</span>
+                        <span>Mes actual</span>
+                      </div>
+                    </>
+                  )}
+
+                  {paymentType === 'both' && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Mensualidad - {clientData?.plan?.name}</span>
+                        <span className="font-medium">${(clientData?.plan as any)?.price || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Impresiones pendientes</span>
+                        <span className="font-medium">${calculatePendingPrintingTotal()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Período mensualidad</span>
+                        <span>{nextPaymentInfo.period}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Período impresiones</span>
+                        <span>Mes actual</span>
+                      </div>
+                      <div className="border-t pt-2 mt-2">
+                        <div className="flex justify-between font-bold">
+                          <span>TOTAL</span>
+                          <span className="text-lg">${((clientData?.plan as any)?.price || 0) + calculatePendingPrintingTotal()}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Datos bancarios */}
+              <div className="space-y-4 mb-6">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-medium text-blue-800 mb-2">Datos para la transferencia:</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Alias:</span>
+                      <span className="font-mono text-sm">RamosGenerales.mp</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">CBU/CVU:</span>
+                      <span className="font-mono text-xs">00000031000000000000000</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Titular:</span>
+                      <span className="text-sm">Ramos Generales S.A.</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">CUIT:</span>
+                      <span className="text-sm">30-12345678-9</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm font-medium text-yellow-800 mb-1">Importe a transferir:</p>
+                  <p className="text-2xl font-bold text-yellow-800">
+                    ${paymentType === 'membership' 
+                      ? ((clientData?.plan as any)?.price || 0)
+                      : paymentType === 'printing'
+                      ? calculatePendingPrintingTotal()
+                      : ((clientData?.plan as any)?.price || 0) + calculatePendingPrintingTotal()
+                    }
+                  </p>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    Referencia: {paymentType === 'printing' ? 'Impresiones ' : ''}{nextPaymentInfo.period}
+                  </p>
+                </div>
+
+                {/* Campo de carga de comprobante */}
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm font-medium text-green-800 mb-3">📸 Adjuntar comprobante de pago:</p>
+                  
+                  {!receiptPreview ? (
+                    <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center">
+                      <input
+                        type="file"
+                        id="receipt"
+                        accept="image/*"
+                        onChange={handleReceiptChange}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="receipt"
+                        className="cursor-pointer block"
+                      >
+                        <div className="text-green-600 mb-2">
+                          <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                        </div>
+                        <p className="text-sm text-green-700 font-medium">Hacer clic para subir comprobante</p>
+                        <p className="text-xs text-green-600 mt-1">JPG, PNG - Máximo 5MB</p>
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <img
+                          src={receiptPreview}
+                          alt="Vista previa del comprobante"
+                          className="w-full h-48 object-cover rounded-lg border"
+                        />
+                        <button
+                          onClick={clearReceipt}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      <p className="text-sm text-green-700 font-medium text-center">✅ Comprobante cargado</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowTransferModal(false)
+                    clearReceipt()
+                    setPaymentType('membership')
+                  }}
+                  disabled={uploading}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleCopyAlias}
+                  disabled={uploading}
+                >
+                  Copiar Alias
+                </Button>
+              </div>
+
+              <Button
+                className="w-full mt-3 bg-green-600 hover:bg-green-700"
+                onClick={handleMarkAsPaid}
+                disabled={uploading || !receiptFile}
+              >
+                {uploading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Enviando...
+                  </>
+                ) : (
+                  'Enviar Solicitud con Comprobante'
+                )}
+              </Button>
+
+              {!receiptFile && (
+                <p className="text-xs text-amber-600 text-center mt-2">
+                  ⚠️ Debes adjuntar el comprobante para continuar
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Historial de Pagos */}
         <Card className="p-6 border">

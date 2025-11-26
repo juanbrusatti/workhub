@@ -455,7 +455,7 @@ export default function PrintingManagement() {
                               <>
                                 <CheckCircle className="h-3 w-3" />
                                 <span className="hidden sm:inline">Marcar como pagado</span>
-                                <span className="sm:hidden">Pagar</span>
+                                <span className="sm:hidden">Marcar como pagado</span>
                               </>
                             )}
                           </Button>
