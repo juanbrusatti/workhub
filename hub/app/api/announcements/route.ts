@@ -204,7 +204,7 @@ export async function GET(request: Request) {
 
     console.log('🔍 Obteniendo anuncios de Firestore...')
     
-    // Temporalmente obtener todos los anuncios y filtrar en cliente hasta que el índice esté listo
+    // Obtener todos los anuncios (los eliminados permanentemente no existirán)
     const announcementsSnapshot = await adminDb
       .collection('announcements')
       .get()
@@ -216,12 +216,10 @@ export async function GET(request: Request) {
         const data = doc.data()
         return {
           id: doc.id,
-          active: data.active,
           ...data,
           createdAt: data.createdAt?.toDate?.() || new Date()
         }
       })
-      .filter((announcement: any) => announcement.active === true)
       .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())
 
     console.log('✅ Anuncios procesados:', announcements.length)
@@ -260,14 +258,12 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID del anuncio requerido' }, { status: 400 })
     }
 
-    // Desactivar el anuncio (borrado lógico)
-    await adminDb.collection('announcements').doc(announcementId).update({
-      active: false,
-      deletedAt: new Date(),
-      deletedBy: decodedToken.uid
-    })
+    // Eliminar permanentemente el anuncio de Firebase
+    console.log(`🗑️ Eliminando permanentemente el anuncio ${announcementId}...`)
+    
+    await adminDb.collection('announcements').doc(announcementId).delete()
 
-    console.log(`Anuncio ${announcementId} eliminado por admin ${decodedToken.uid}`)
+    console.log(`✅ Anuncio ${announcementId} eliminado permanentemente por admin ${decodedToken.uid}`)
 
     return NextResponse.json({ success: true })
 
