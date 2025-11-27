@@ -15,6 +15,17 @@ interface PaymentRequestEmailData {
   printSheets?: number // Cantidad total de hojas
 }
 
+interface AnnouncementEmailData {
+  clientEmail: string
+  clientName: string
+  companyName: string
+  title: string
+  content: string
+  type: 'info' | 'maintenance' | 'event'
+  priority: 'low' | 'medium' | 'high'
+  createdAt: Date
+}
+
 export async function sendPaymentRequestEmail(data: PaymentRequestEmailData) {
   try {
     // Configurar el transporter de Gmail
@@ -308,6 +319,114 @@ export async function sendPaymentRejectionEmail(data: RejectionEmailData) {
     return { success: true, messageId: result.messageId }
   } catch (error) {
     console.error('Error al enviar email de rechazo:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' }
+  }
+}
+
+export async function sendAnnouncementEmail(data: AnnouncementEmailData) {
+  try {
+    // Verificar variables de entorno
+    console.log('🔍 Variables de entorno de Gmail:')
+    console.log('📧 EMAIL_USER:', process.env.EMAIL_USER ? 'Configurado' : '❌ No configurado')
+    console.log('🔑 EMAIL_PASS:', process.env.EMAIL_PASS ? 'Configurado' : '❌ No configurado')
+    
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      throw new Error('Variables de entorno de Gmail no configuradas')
+    }
+
+    // Configurar el transporter de Gmail
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    })
+
+    console.log('📧 Transporter de Gmail configurado')
+
+    // Configurar colores y emojis según el tipo y prioridad
+    const typeConfig = {
+      info: { emoji: 'ℹ️', color: '#3b82f6', label: 'Información' },
+      maintenance: { emoji: '🔧', color: '#f59e0b', label: 'Mantenimiento' },
+      event: { emoji: '🎉', color: '#10b981', label: 'Evento' }
+    }
+
+    const priorityConfig = {
+      low: { label: 'Baja', color: '#6b7280' },
+      medium: { label: 'Media', color: '#f59e0b' },
+      high: { label: 'Alta', color: '#ef4444' }
+    }
+
+    const typeInfo = typeConfig[data.type]
+    const priorityInfo = priorityConfig[data.priority]
+
+    // Crear el contenido del email
+    const emailContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: ${typeInfo.color}; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <div style="font-size: 48px; margin-bottom: 10px;">${typeInfo.emoji}</div>
+          <h1 style="color: white; margin: 0; font-size: 28px;">${data.title}</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">${typeInfo.label} - Prioridad ${priorityInfo.label}</p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px;">
+          <div style="background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #333; margin-top: 0;">👤 Información</h3>
+            <ul style="color: #666; line-height: 1.6;">
+              <li><strong>Cliente:</strong> ${data.clientName}</li>
+              <li><strong>Empresa:</strong> ${data.companyName}</li>
+              <li><strong>Fecha:</strong> ${data.createdAt.toLocaleString('es-AR')}</li>
+              <li><strong>Tipo:</strong> <span style="color: ${typeInfo.color}; font-weight: bold;">${typeInfo.label}</span></li>
+              <li><strong>Prioridad:</strong> <span style="color: ${priorityInfo.color}; font-weight: bold;">${priorityInfo.label}</span></li>
+            </ul>
+          </div>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 8px;">
+            <h3 style="color: #333; margin-top: 0;">📝 Mensaje</h3>
+            <div style="color: #666; line-height: 1.6; white-space: pre-wrap;">${data.content}</div>
+          </div>
+          
+          ${data.priority === 'high' ? `
+          <div style="background-color: #fef2f2; border: 2px solid #ef4444; padding: 15px; border-radius: 8px; margin-top: 20px;">
+            <p style="color: #dc2626; margin: 0; font-weight: bold; text-align: center;">
+              ⚠️ ESTE ANUNCIO ES DE ALTA PRIORIDAD - POR FAVOR REVISAR INMEDIATAMENTE
+            </p>
+          </div>
+          ` : ''}
+          
+          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; margin: 0; font-size: 14px;">
+              Este anuncio fue enviado automáticamente desde el sistema de gestión de CoWorkHub.
+            </p>
+            <p style="color: #6b7280; margin: 5px 0 0 0; font-size: 12px;">
+              Si tienes alguna pregunta, contacta al administrador de tu espacio de coworking.
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+
+    // Determinar el asunto según tipo y prioridad
+    let subject = `${typeInfo.emoji} ${data.title} - CoWorkHub`
+    if (data.priority === 'high') {
+      subject = `⚠️ URGENTE: ${data.title} - CoWorkHub`
+    }
+
+    // Enviar el email
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: data.clientEmail,
+      subject,
+      html: emailContent
+    }
+
+    const result = await transporter.sendMail(mailOptions)
+    console.log(`Email de anuncio enviado a ${data.clientEmail}:`, result.messageId)
+    
+    return { success: true, messageId: result.messageId }
+  } catch (error) {
+    console.error('Error al enviar email de anuncio:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' }
   }
 }
