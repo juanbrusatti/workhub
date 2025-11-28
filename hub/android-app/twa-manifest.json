@@ -1,0 +1,70 @@
+{
+  "packageId": "app.vercel.workhub_smoky.twa",
+  "host": "workhub-smoky.vercel.app",
+  "name": "Ramos Generales",
+  "launcherName": "RG",
+  "display": "standalone",
+  "themeColor": "#000000",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#FFFFFF",
+  "enableNotifications": true,
+  "startUrl": "/client/dashboard",
+  "iconUrl": "https://workhub-smoky.vercel.app/icon-512x512.png",
+  "maskableIconUrl": "https://workhub-smoky.vercel.app/icon-512x512-maskable.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "/Users/juanbrusatti/Desktop/workhub/hub/android-app/android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Make Reservation",
+      "shortName": "Reserve",
+      "url": "https://workhub-smoky.vercel.app/client/dashboard?tab=reservations",
+      "chosenIconUrl": "https://workhub-smoky.vercel.app/shortcut-desk.png"
+    },
+    {
+      "name": "View Payments",
+      "shortName": "Billing",
+      "url": "https://workhub-smoky.vercel.app/client/payments",
+      "chosenIconUrl": "https://workhub-smoky.vercel.app/shortcut-payments.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://workhub-smoky.vercel.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://workhub-smoky.vercel.app/",
+  "minSdkVersion": 21,
+  "shareTarget": {
+    "action": "https://workhub-smoky.vercel.app/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "orientation": "portrait-primary",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [],
+  "appVersion": "1"
+}
