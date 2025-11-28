@@ -1,6 +1,7 @@
 {
   "name": "CoWorkHub - Premium Coworking Space Management",
   "short_name": "CoWorkHub",
+  "id": "coworkhub-app",
   "description": "Manage your coworking membership, reserve desks, and access workspace features",
   "start_url": "/client/dashboard",
   "scope": "/",
@@ -12,13 +13,13 @@
   "screenshots": [
     {
       "src": "/screenshots/dashboard-mobile.png",
-      "sizes": "540x720",
+      "sizes": "256x144",
       "type": "image/png",
       "form_factor": "narrow"
     },
     {
       "src": "/screenshots/dashboard-desktop.png",
-      "sizes": "1280x720",
+      "sizes": "256x144",
       "type": "image/png",
       "form_factor": "wide"
     }
