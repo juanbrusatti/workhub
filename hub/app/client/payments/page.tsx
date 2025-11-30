@@ -25,6 +25,9 @@ function PaymentsPage() {
   const [printRecords, setPrintRecords] = useState<any[]>([])
   const [loadingPrintRecords, setLoadingPrintRecords] = useState(false)
   const [paymentType, setPaymentType] = useState<'membership' | 'printing' | 'both'>('membership')
+  const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'qr'>('transfer')
+  const [qrData, setQrData] = useState<any>(null)
+  const [loadingQR, setLoadingQR] = useState(false)
 
   // Calcular próximo período de pago
   const getNextPaymentPeriod = () => {
@@ -525,6 +528,71 @@ function PaymentsPage() {
     }
   }
 
+  const handleGenerateQR = async () => {
+    setLoadingQR(true)
+    
+    try {
+      const token = await getIdToken()
+      if (!token) {
+        throw new Error('No se pudo obtener el token de autenticación')
+      }
+
+      // Calcular montos según el tipo de pago
+      let amount = 0
+      let description = ''
+
+      if (paymentType === 'membership') {
+        amount = (clientData.plan as any).price
+        description = `Mensualidad - ${clientData.plan.name}`
+      } else if (paymentType === 'printing') {
+        amount = calculatePendingPrintingTotal()
+        description = `Impresiones pendientes - ${calculatePendingPrintingSheets()} hojas`
+      } else if (paymentType === 'both') {
+        amount = ((clientData.plan as any).price || 0) + calculatePendingPrintingTotal()
+        description = `Mensualidad + Impresiones - ${clientData.plan.name} + ${calculatePendingPrintingSheets()} hojas`
+      }
+
+      const qrRequest = {
+        amount: amount,
+        description: description,
+        clientId: clientData.id,
+        paymentType: paymentType,
+        planName: clientData.plan.name,
+        printRecords: paymentType === 'printing' || paymentType === 'both' ? printRecords.map(record => record.id) : []
+      }
+
+      const response = await fetch('/api/create-qr', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(qrRequest)
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al generar el código QR')
+      }
+
+      const data = await response.json()
+      setQrData(data.qrData)
+      
+      toast({
+        title: "QR generado",
+        description: "Código QR generado correctamente. Escanéalo para pagar.",
+      })
+      
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo generar el código QR",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingQR(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <ClientNav user={user} onLogout={handleLogout} />
@@ -702,6 +770,36 @@ function PaymentsPage() {
             <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 border-2 border-gray-300 shadow-2xl max-h-[90vh] overflow-y-auto">
               <h3 className="text-xl font-bold mb-4">Opciones de Pago</h3>
               
+              {/* Método de pago */}
+              <div className="mb-6">
+                <h4 className="font-semibold mb-3">Seleccioná el método de pago:</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <Button
+                    variant={paymentMethod === 'transfer' ? 'default' : 'outline'}
+                    onClick={() => setPaymentMethod('transfer')}
+                    className="flex flex-col items-center p-4 h-auto"
+                  >
+                    <div className="text-2xl mb-2">🏦</div>
+                    <div className="text-sm font-medium">Transferencia</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Transferencia bancaria tradicional
+                    </div>
+                  </Button>
+
+                  <Button
+                    variant={paymentMethod === 'qr' ? 'default' : 'outline'}
+                    onClick={() => setPaymentMethod('qr')}
+                    className="flex flex-col items-center p-4 h-auto"
+                  >
+                    <div className="text-2xl mb-2">📱</div>
+                    <div className="text-sm font-medium">QR MercadoPago</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Pago instantáneo con QR
+                    </div>
+                  </Button>
+                </div>
+              </div>
+              
               {/* Opciones de pago */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <Button
@@ -809,93 +907,191 @@ function PaymentsPage() {
                 </div>
               </div>
 
-              {/* Datos bancarios */}
-              <div className="space-y-4 mb-6">
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm font-medium text-blue-800 mb-2">Datos para la transferencia:</p>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Alias:</span>
-                      <span className="font-mono text-sm">RamosGenerales.mp</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">CBU/CVU:</span>
-                      <span className="font-mono text-xs">00000031000000000000000</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Titular:</span>
-                      <span className="text-sm">Ramos Generales S.A.</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">CUIT:</span>
-                      <span className="text-sm">30-12345678-9</span>
+              {/* Contenido dinámico según método de pago */}
+              {paymentMethod === 'transfer' ? (
+                /* Formulario de transferencia tradicional */
+                <div className="space-y-4 mb-6">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm font-medium text-blue-800 mb-2">Datos para la transferencia:</p>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Alias:</span>
+                        <span className="font-mono text-sm">RamosGenerales.mp</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">CBU/CVU:</span>
+                        <span className="font-mono text-xs">00000031000000000000000</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Titular:</span>
+                        <span className="text-sm">Ramos Generales S.A.</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">CUIT:</span>
+                        <span className="text-sm">30-12345678-9</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm font-medium text-yellow-800 mb-1">Importe a transferir:</p>
-                  <p className="text-2xl font-bold text-yellow-800">
-                    ${paymentType === 'membership' 
-                      ? ((clientData?.plan as any)?.price || 0)
-                      : paymentType === 'printing'
-                      ? calculatePendingPrintingTotal()
-                      : ((clientData?.plan as any)?.price || 0) + calculatePendingPrintingTotal()
-                    }
-                  </p>
-                  <p className="text-xs text-yellow-700 mt-1">
-                    Referencia: {paymentType === 'printing' ? 'Impresiones ' : ''}{nextPaymentInfo.period}
-                  </p>
-                </div>
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm font-medium text-yellow-800 mb-1">Importe a transferir:</p>
+                    <p className="text-2xl font-bold text-yellow-800">
+                      ${paymentType === 'membership' 
+                        ? ((clientData?.plan as any)?.price || 0)
+                        : paymentType === 'printing'
+                        ? calculatePendingPrintingTotal()
+                        : ((clientData?.plan as any)?.price || 0) + calculatePendingPrintingTotal()
+                      }
+                    </p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      Referencia: {paymentType === 'printing' ? 'Impresiones ' : ''}{nextPaymentInfo.period}
+                    </p>
+                  </div>
 
-                {/* Campo de carga de comprobante */}
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm font-medium text-green-800 mb-3">📸 Adjuntar comprobante de pago:</p>
-                  
-                  {!receiptPreview ? (
-                    <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center">
-                      <input
-                        type="file"
-                        id="receipt"
-                        accept="image/*"
-                        onChange={handleReceiptChange}
-                        className="hidden"
-                      />
-                      <label
-                        htmlFor="receipt"
-                        className="cursor-pointer block"
-                      >
-                        <div className="text-green-600 mb-2">
-                          <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  {/* Campo de carga de comprobante */}
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm font-medium text-green-800 mb-3">📸 Adjuntar comprobante de pago:</p>
+                    
+                    {!receiptPreview ? (
+                      <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center">
+                        <input
+                          type="file"
+                          id="receipt"
+                          accept="image/*"
+                          onChange={handleReceiptChange}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="receipt"
+                          className="cursor-pointer block"
+                        >
+                          <div className="text-green-600 mb-2">
+                            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                          </div>
+                          <p className="text-sm text-green-700 font-medium">Hacer clic para subir comprobante</p>
+                          <p className="text-xs text-green-600 mt-1">JPG, PNG - Máximo 5MB</p>
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <img
+                            src={receiptPreview}
+                            alt="Vista previa del comprobante"
+                            className="w-full h-48 object-cover rounded-lg border"
+                          />
+                          <button
+                            onClick={clearReceipt}
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <p className="text-sm text-green-700 font-medium text-center">✅ Comprobante cargado</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Formulario de QR MercadoPago */
+                <div className="space-y-4 mb-6">
+                  {!qrData ? (
+                    <>
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                        <div className="text-blue-600 mb-3">
+                          <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                           </svg>
                         </div>
-                        <p className="text-sm text-green-700 font-medium">Hacer clic para subir comprobante</p>
-                        <p className="text-xs text-green-600 mt-1">JPG, PNG - Máximo 5MB</p>
-                      </label>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="relative">
-                        <img
-                          src={receiptPreview}
-                          alt="Vista previa del comprobante"
-                          className="w-full h-48 object-cover rounded-lg border"
-                        />
-                        <button
-                          onClick={clearReceipt}
-                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                        <p className="text-sm text-blue-800 font-medium mb-2">Pago instantáneo con MercadoPago QR</p>
+                        <p className="text-xs text-blue-700">
+                          Generá un código QR para pagar instantáneamente desde la app de MercadoPago.
+                          Una vez aprobado, el pago se registrará automáticamente.
+                        </p>
                       </div>
-                      <p className="text-sm text-green-700 font-medium text-center">✅ Comprobante cargado</p>
-                    </div>
+
+                      <Button
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        onClick={handleGenerateQR}
+                        disabled={loadingQR}
+                      >
+                        {loadingQR ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                            Generando QR...
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-xl mr-2">📱</div>
+                            Generar Código QR
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-sm font-medium text-green-800 mb-3">📱 Escaneá el código QR:</p>
+                        
+                        <div className="bg-white p-4 rounded-lg mb-4">
+                          <div className="w-64 h-64 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
+                            <iframe 
+                              src={qrData.qrCode}
+                              className="w-full h-full"
+                              frameBorder="0"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="text-center space-y-2">
+                          <p className="text-sm text-green-700">
+                            <strong>Importe:</strong> ${qrData.amount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-sm text-green-700">
+                            <strong>Descripción:</strong> {qrData.description}
+                          </p>
+                          <p className="text-xs text-green-600">
+                            El código QR expira en 24 horas
+                          </p>
+                        </div>
+
+                        <div className="mt-4 text-center">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(qrData.initPoint, '_blank')}
+                            className="mr-2"
+                          >
+                            Abrir en MercadoPago
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setQrData(null)}
+                          >
+                            Generar nuevo QR
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800 font-medium mb-2">📋 Instrucciones:</p>
+                        <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                          <li>Abrí la app de MercadoPago</li>
+                          <li>Presioná "Pagar" y escaneá el código QR</li>
+                          <li>Confirmá los datos del pago</li>
+                          <li>El pago se aprobará automáticamente</li>
+                          <li>Recibirás una notificación cuando se confirme</li>
+                        </ol>
+                      </div>
+                    </>
                   )}
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-3">
                 <Button
@@ -905,36 +1101,42 @@ function PaymentsPage() {
                     setShowTransferModal(false)
                     clearReceipt()
                     setPaymentType('membership')
+                    setPaymentMethod('transfer')
+                    setQrData(null)
                   }}
-                  disabled={uploading}
+                  disabled={uploading || loadingQR}
                 >
                   Cancelar
                 </Button>
-                <Button
-                  className="flex-1"
-                  onClick={handleCopyAlias}
-                  disabled={uploading}
-                >
-                  Copiar Alias
-                </Button>
+                {paymentMethod === 'transfer' && (
+                  <Button
+                    className="flex-1"
+                    onClick={handleCopyAlias}
+                    disabled={uploading}
+                  >
+                    Copiar Alias
+                  </Button>
+                )}
               </div>
 
-              <Button
-                className="w-full mt-3 bg-green-600 hover:bg-green-700"
-                onClick={handleMarkAsPaid}
-                disabled={uploading || !receiptFile}
-              >
-                {uploading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Enviando...
-                  </>
-                ) : (
-                  'Enviar Solicitud con Comprobante'
-                )}
-              </Button>
+              {paymentMethod === 'transfer' && (
+                <Button
+                  className="w-full mt-3 bg-green-600 hover:bg-green-700"
+                  onClick={handleMarkAsPaid}
+                  disabled={uploading || !receiptFile}
+                >
+                  {uploading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Enviando...
+                    </>
+                  ) : (
+                    'Enviar Solicitud con Comprobante'
+                  )}
+                </Button>
+              )}
 
-              {!receiptFile && (
+              {paymentMethod === 'transfer' && !receiptFile && (
                 <p className="text-xs text-amber-600 text-center mt-2">
                   ⚠️ Debes adjuntar el comprobante para continuar
                 </p>
