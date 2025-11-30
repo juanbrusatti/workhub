@@ -74,8 +74,9 @@ export async function POST(request: Request) {
       timestamp: new Date().toISOString()
     }
     
-    // Generar QR con API externa (tamaño reducido)
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(JSON.stringify(qrData))}`
+    // Generar QR con la URL de MercadoPago (para que funcione al escanear)
+    const paymentUrl = result.init_point || result.sandbox_init_point || ''
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=252x252&data=${encodeURIComponent(paymentUrl)}&bgcolor=ffffff&color=000000`
 
     // Guardar información del QR en Firestore para seguimiento
     const qrDataFirestore = {
