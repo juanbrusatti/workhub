@@ -3,123 +3,148 @@
 import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { mockRooms } from "@/lib/mock-data"
-import { format } from "date-fns"
+import { useAuth } from "@/lib/auth-context"
+import { useToast } from "@/components/ui/use-toast"
 
 interface ReservationSectionProps {
   clientId: string
 }
 
 export default function ReservationSection({ clientId }: ReservationSectionProps) {
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"))
-  const [selectedRoom, setSelectedRoom] = useState("1")
-  const [reservations, setReservations] = useState<any[]>([])
+  const { user, getIdToken } = useAuth()
+  const { toast } = useToast()
+  
+  const [type, setType] = useState<'yerba'|'broken'|'other'>('yerba')
+  const [priority, setPriority] = useState<'low'|'medium'|'high'>('low')
+  const [message, setMessage] = useState('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleReserveDesk = (deskId: string, deskName: string) => {
-    const reservation = {
-      id: Math.random().toString(),
-      deskId,
-      deskName,
-      date: selectedDate,
-      startTime: "09:00",
-      endTime: "17:00",
-      status: "confirmed",
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Error', description: 'El archivo debe ser una imagen', variant: 'destructive' })
+      return
     }
-    setReservations([...reservations, reservation])
+    setImageFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => setImagePreview(reader.result as string)
+    reader.readAsDataURL(file)
   }
 
-  const handleCancelReservation = (id: string) => {
-    setReservations(reservations.filter((r) => r.id !== id))
+  const clearImage = () => {
+    setImageFile(null)
+    setImagePreview(null)
   }
 
-  const room = mockRooms.find((r) => r.id === selectedRoom)
+  const handleSubmit = async () => {
+    if (!user) {
+      toast({ title: 'No autorizado', description: 'Debes iniciar sesión para enviar un reporte', variant: 'destructive' })
+      return
+    }
+    if (!message.trim()) {
+      toast({ title: 'Error', description: 'El mensaje no puede estar vacío', variant: 'destructive' })
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const token = await getIdToken()
+      const body: any = {
+        clientId,
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        type,
+        priority,
+        message,
+      }
+
+      if (imagePreview) body.image = imagePreview
+
+      const res = await fetch('/api/client/reports', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      })
+
+      if (!res.ok) throw new Error('Error al enviar el reporte')
+
+      toast({ title: 'Reporte enviado', description: 'El administrador ha sido notificado' })
+      setType('yerba')
+      setPriority('low')
+      setMessage('')
+      clearImage()
+    } catch (err) {
+      console.error(err)
+      toast({ title: 'Error', description: 'No se pudo enviar el reporte', variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="p-4 border">
-          <label className="block text-sm font-medium mb-2">Select Date</label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            min={format(new Date(), "yyyy-MM-dd")}
-            className="w-full px-3 py-2 border rounded-md bg-background"
-          />
-        </Card>
-
-        <Card className="p-4 border">
-          <label className="block text-sm font-medium mb-2">Select Room</label>
-          <select
-            value={selectedRoom}
-            onChange={(e) => setSelectedRoom(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md bg-background"
-          >
-            {mockRooms.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </Card>
-      </div>
-
       <Card className="p-6 border">
-        <h3 className="text-xl font-bold mb-4">{room?.name}</h3>
-        <p className="text-muted-foreground mb-6">{room?.description}</p>
+        <h3 className="text-xl font-bold mb-4">Reportar incidencia al administrador</h3>
 
-        <h4 className="font-semibold mb-4">Available Desks</h4>
-        <div className="grid gap-3 md:grid-cols-3 mb-6">
-          {room?.desks && room.desks.length > 0 ? (
-            room.desks.map((desk) => (
-              <div
-                key={desk.id}
-                className={`p-4 border-2 rounded-lg transition ${
-                  desk.status === "available"
-                    ? "border-green-300 bg-green-50 dark:bg-green-900/20 cursor-pointer"
-                    : "border-gray-300 bg-gray-50 dark:bg-gray-900/20 opacity-50"
-                }`}
-              >
-                <p className="font-semibold">{desk.name}</p>
-                <p className="text-sm text-muted-foreground capitalize mb-3">{desk.status}</p>
-                {desk.status === "available" && (
-                  <Button size="sm" onClick={() => handleReserveDesk(desk.id, desk.name)} className="w-full">
-                    Reserve
-                  </Button>
-                )}
-              </div>
-            ))
-          ) : (
-            <div className="col-span-3 text-center py-6 text-muted-foreground">No desks in this room</div>
-          )}
+        <div className="grid gap-4 md:grid-cols-3 mb-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Tipo de reporte</label>
+            <select value={type} onChange={(e) => setType(e.target.value as any)} className="w-full px-3 py-2 border rounded-md bg-background">
+              <option value="yerba">insumos</option>
+              <option value="broken">mantenimiento</option>
+              <option value="other">Otro problema</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Prioridad</label>
+            <select value={priority} onChange={(e) => setPriority(e.target.value as any)} className="w-full px-3 py-2 border rounded-md bg-background">
+              <option value="low">Baja</option>
+              <option value="medium">Media</option>
+              <option value="high">Alta</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Foto (opcional)</label>
+            <input type="file" accept="image/*" onChange={handleImageChange} className="w-full" />
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">Descripción del problema</label>
+          <textarea 
+            value={message} 
+            onChange={(e) => setMessage(e.target.value)} 
+            className="w-full p-3 border rounded-md bg-background" 
+            rows={5}
+            placeholder="Describe el problema con el mayor detalle posible..."
+          />
+        </div>
+
+        {imagePreview && (
+          <div className="mb-4">
+            <p className="text-sm font-medium mb-2">Vista previa:</p>
+            <img src={imagePreview} alt="preview" className="w-48 h-48 object-cover rounded border" />
+            <Button variant="outline" size="sm" onClick={clearImage} className="mt-2">
+              Quitar imagen
+            </Button>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <Button onClick={handleSubmit} disabled={submitting} className="bg-blue-600 hover:bg-blue-700">
+            {submitting ? '⏳ Enviando...' : '📤 Enviar Reporte'}
+          </Button>
         </div>
       </Card>
-
-      {reservations.length > 0 && (
-        <Card className="p-6 border">
-          <h3 className="text-xl font-bold mb-4">Your Reservations</h3>
-          <div className="space-y-3">
-            {reservations.map((res) => (
-              <div key={res.id} className="flex justify-between items-center p-4 bg-secondary/50 rounded-lg">
-                <div>
-                  <p className="font-semibold">{res.deskName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {res.date} • {res.startTime} - {res.endTime}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleCancelReservation(res.id)}
-                  className="text-destructive"
-                >
-                  Cancel
-                </Button>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
     </div>
   )
 }

@@ -430,3 +430,120 @@ export async function sendAnnouncementEmail(data: AnnouncementEmailData) {
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' }
   }
 }
+
+export async function sendReportEmail(data: {
+  clientName: string
+  clientEmail: string
+  type: 'yerba' | 'broken' | 'other'
+  priority: 'low' | 'medium' | 'high'
+  message: string
+  image: string | null
+  reportId: string
+  createdAt: Date
+}) {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    })
+
+    const typeConfig = {
+      yerba: { emoji: '🌿', label: 'Falta de insumos' },
+      broken: { emoji: '🔧', label: 'Mantenimiento' },
+      other: { emoji: '⚠️', label: 'Otro problema' }
+    }
+
+    const priorityConfig = {
+      low: { label: 'Baja', color: '#6b7280' },
+      medium: { label: 'Media', color: '#f59e0b' },
+      high: { label: 'Alta', color: '#ef4444' }
+    }
+
+    const typeInfo = typeConfig[data.type]
+    const priorityInfo = priorityConfig[data.priority]
+
+    const emailContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #3b82f6; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <div style="font-size: 48px; margin-bottom: 10px;">${typeInfo.emoji}</div>
+          <h1 style="color: white; margin: 0; font-size: 24px;">Nuevo Reporte de Cliente</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">${typeInfo.label}</p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px;">
+          <div style="background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #333; margin-top: 0;">👤 Información del Cliente</h3>
+            <ul style="color: #666; line-height: 1.6;">
+              <li><strong>Cliente:</strong> ${data.clientName}</li>
+              <li><strong>Email:</strong> ${data.clientEmail}</li>
+              <li><strong>Fecha:</strong> ${data.createdAt.toLocaleString('es-AR')}</li>
+              <li><strong>ID Reporte:</strong> ${data.reportId}</li>
+            </ul>
+          </div>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #333; margin-top: 0;">📋 Detalles del Reporte</h3>
+            <ul style="color: #666; line-height: 1.6;">
+              <li><strong>Tipo:</strong> ${typeInfo.label}</li>
+              <li><strong>Prioridad:</strong> <span style="color: ${priorityInfo.color}; font-weight: bold;">${priorityInfo.label}</span></li>
+            </ul>
+          </div>
+
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3b82f6;">
+            <h3 style="color: #333; margin-top: 0;">💬 Mensaje</h3>
+            <p style="color: #666; margin: 0; white-space: pre-wrap;">${data.message}</p>
+          </div>
+
+          ${data.image ? `
+          <div style="background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #333; margin-top: 0;">📸 Imagen Adjunta</h3>
+            <p style="color: #666;">El cliente ha adjuntado una imagen. Revisar en el panel de administración.</p>
+          </div>
+          ` : ''}
+
+          ${data.priority === 'high' ? `
+          <div style="background-color: #fef2f2; border: 2px solid #ef4444; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <p style="color: #dc2626; margin: 0; font-weight: bold; text-align: center;">
+              ⚠️ REPORTE DE ALTA PRIORIDAD - REQUIERE ATENCIÓN INMEDIATA
+            </p>
+          </div>
+          ` : ''}
+
+          <div style="background-color: #e0f2fe; padding: 15px; border-radius: 8px; margin-top: 20px;">
+            <p style="color: #0369a1; margin: 0; font-weight: bold; text-align: center;">
+              Acceder al panel de administración para gestionar este reporte
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; margin: 0; font-size: 14px;">
+              Este reporte fue enviado automáticamente desde el sistema de gestión de CoWorkHub.
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+
+    const subject = data.priority === 'high' 
+      ? `⚠️ URGENTE: ${typeInfo.label} - Reporte de ${data.clientName}`
+      : `${typeInfo.emoji} Nuevo Reporte: ${typeInfo.label} de ${data.clientName}`
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: 'coworkhub25@gmail.com',
+      subject,
+      html: emailContent
+    }
+
+    const result = await transporter.sendMail(mailOptions)
+    console.log('Email de reporte enviado exitosamente:', result.messageId)
+    
+    return { success: true, messageId: result.messageId }
+  } catch (error) {
+    console.error('Error al enviar email de reporte:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' }
+  }
+}
