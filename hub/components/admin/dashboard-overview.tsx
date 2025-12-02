@@ -3,7 +3,7 @@
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2, Eye, EyeOff } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
 
 type AdminClient = {
@@ -45,35 +45,72 @@ export default function DashboardOverview() {
   const [showRevenue, setShowRevenue] = useState(true)
   const { getIdToken } = useAuth()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = await getIdToken()
-        if (!token) return
+  const fetchData = useCallback(async () => {
+    try {
+      const token = await getIdToken()
+      if (!token) return
 
-        // Fetch clients
-        const clientsResponse = await fetch("/api/admin/clients", {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        
-        if (clientsResponse.ok) {
-          const clientsData = await clientsResponse.json()
-          setClients(clientsData.clients || [])
-        }
-
-        // TODO: Add rooms API endpoint when available
-        // For now, we'll use mock rooms data or show placeholder
-        setRooms([]) // Empty until we have real rooms data
-
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error)
-      } finally {
-        setLoading(false)
+      // Fetch clients
+      const clientsResponse = await fetch("/api/admin/clients", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      if (clientsResponse.ok) {
+        const clientsData = await clientsResponse.json()
+        setClients(clientsData.clients || [])
       }
-    }
 
-    fetchData()
+      setRooms([])
+
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error)
+    } finally {
+      setLoading(false)
+    }
   }, [getIdToken])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // Calculate real statistics with memoization
+  const stats = useMemo(() => {
+    const activeClients = clients.filter((c) => c.status === "active").length
+    const totalDesks = rooms.reduce((sum, room) => sum + room.desks.length, 0)
+    const availableDesks = rooms.reduce(
+      (sum, room) => sum + room.desks.filter((d) => d.status === "available").length,
+      0,
+    )
+    const monthlyRevenue = clients
+      .filter((c) => c.status === "active" && c.plan)
+      .reduce((sum, c) => sum + (c.plan?.price || 0), 0)
+
+    return [
+      {
+        label: "Clientes Activos",
+        value: activeClients,
+        color: "text-blue-600",
+      },
+      {
+        label: "Total Escritorios",
+        value: totalDesks || "N/A",
+        color: "text-green-600",
+      },
+      {
+        label: "Escritorios Disponibles",
+        value: availableDesks || "N/A",
+        color: "text-amber-600",
+      },
+      {
+        label: "Ingresos Mensuales",
+        value: showRevenue 
+          ? (monthlyRevenue > 0 ? `$${monthlyRevenue.toLocaleString('es-AR')}` : "$0")
+          : "••••••••",
+        color: "text-purple-600",
+        showToggle: true,
+      },
+    ]
+  }, [clients, rooms, showRevenue])
 
   if (loading) {
     return (
@@ -85,43 +122,6 @@ export default function DashboardOverview() {
       </div>
     )
   }
-
-  // Calculate real statistics
-  const activeClients = clients.filter((c) => c.status === "active").length
-  const totalDesks = rooms.reduce((sum, room) => sum + room.desks.length, 0)
-  const availableDesks = rooms.reduce(
-    (sum, room) => sum + room.desks.filter((d) => d.status === "available").length,
-    0,
-  )
-  const monthlyRevenue = clients
-    .filter((c) => c.status === "active" && c.plan)
-    .reduce((sum, c) => sum + (c.plan?.price || 0), 0)
-
-  const stats = [
-    {
-      label: "Clientes Activos",
-      value: activeClients,
-      color: "text-blue-600",
-    },
-    {
-      label: "Total Escritorios",
-      value: totalDesks || "N/A",
-      color: "text-green-600",
-    },
-    {
-      label: "Escritorios Disponibles",
-      value: availableDesks || "N/A",
-      color: "text-amber-600",
-    },
-    {
-      label: "Ingresos Mensuales",
-      value: showRevenue 
-        ? (monthlyRevenue > 0 ? `$${monthlyRevenue.toLocaleString('es-AR')}` : "$0")
-        : "••••••••",
-      color: "text-purple-600",
-      showToggle: true,
-    },
-  ]
 
   return (
     <div className="space-y-6">

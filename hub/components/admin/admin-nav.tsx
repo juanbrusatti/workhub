@@ -1,6 +1,7 @@
 "use client"
 
 import type { User } from "@/lib/types"
+import { memo } from "react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Menu } from "lucide-react"
@@ -11,7 +12,7 @@ interface AdminNavProps {
   onLogout: () => void
 }
 
-export default function AdminNav({ user, onLogout }: AdminNavProps) {
+const AdminNav = memo(function AdminNav({ user, onLogout }: AdminNavProps) {
   return (
     <nav className="bg-card border-b sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
@@ -83,4 +84,6 @@ export default function AdminNav({ user, onLogout }: AdminNavProps) {
       </div>
     </nav>
   )
-}
+})
+
+export default AdminNav

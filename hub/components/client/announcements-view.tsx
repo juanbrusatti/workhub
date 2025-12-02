@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Loader2, ChevronLeft, ChevronRight, Info, Wrench, PartyPopper, AlertTriangle } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useAuth } from "@/lib/auth-context"
@@ -34,13 +34,13 @@ export default function ClientAnnouncementsView() {
   const [currentPage, setCurrentPage] = useState(1)
   const { getIdToken } = useAuth()
 
-  const fetchAnnouncements = async (page: number = 1) => {
+  const fetchAnnouncements = useCallback(async (page: number = 1) => {
     try {
       setLoading(true)
       const token = await getIdToken()
 
       if (!token) {
-        console.error('❌ No se pudo obtener token')
+        console.error('No se pudo obtener token')
         return
       }
 
@@ -64,13 +64,13 @@ export default function ClientAnnouncementsView() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getIdToken])
 
   useEffect(() => {
     fetchAnnouncements()
   }, [])
 
-  const getTypeConfig = (type: string) => {
+  const getTypeConfig = useCallback((type: string) => {
     switch (type) {
       case 'info':
         return { icon: Info, color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'Información' }
@@ -81,9 +81,9 @@ export default function ClientAnnouncementsView() {
       default:
         return { icon: Info, color: 'bg-gray-100 text-gray-800 border-gray-200', label: 'General' }
     }
-  }
+  }, [])
 
-  const getPriorityConfig = (priority: string) => {
+  const getPriorityConfig = useCallback((priority: string) => {
     switch (priority) {
       case 'high':
         return { color: 'bg-red-100 text-red-800 border-red-200', label: 'Alta' }
@@ -94,7 +94,7 @@ export default function ClientAnnouncementsView() {
       default:
         return { color: 'bg-gray-100 text-gray-800 border-gray-200', label: 'Normal' }
     }
-  }
+  }, [])
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && pagination && newPage <= pagination.totalPages) {

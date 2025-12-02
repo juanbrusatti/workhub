@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,9 +21,12 @@ export default function QuickPrintAction({ onViewDetails }: { onViewDetails: () 
   const { toast } = useToast()
   const { getIdToken } = useAuth()
 
-  const totalCost = sheets ? parseFloat(sheets) * settings.pricePerSheet : 0
+  const totalCost = useMemo(() => 
+    sheets ? parseFloat(sheets) * settings.pricePerSheet : 0,
+    [sheets, settings.pricePerSheet]
+  )
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       const token = await getIdToken()
       if (!token) return
@@ -41,13 +44,13 @@ export default function QuickPrintAction({ onViewDetails }: { onViewDetails: () 
     } finally {
       setLoading(false)
     }
-  }
+  }, [getIdToken])
 
   useEffect(() => {
     fetchSettings()
   }, [])
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     const sheetsNum = parseInt(sheets)
     
     if (!sheets || sheetsNum <= 0 || sheetsNum > 100) {
@@ -99,7 +102,7 @@ export default function QuickPrintAction({ onViewDetails }: { onViewDetails: () 
     } finally {
       setSubmitting(false)
     }
-  }
+  }, [sheets, totalCost, toast, getIdToken])
 
   if (loading) {
     return (

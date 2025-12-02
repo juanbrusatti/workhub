@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,26 +45,26 @@ export default function PrintingManagement() {
     fetchData()
   }, [])
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const token = await getIdToken()
       if (!token) return
 
-      // Fetch all print records
-      const recordsResponse = await fetch(`/api/admin/printing/records-supabase`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      // Fetch both in parallel
+      const [recordsResponse, settingsResponse] = await Promise.all([
+        fetch(`/api/admin/printing/records-supabase`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`/api/admin/printing/settings-supabase`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ])
       
       if (recordsResponse.ok) {
         const recordsData = await recordsResponse.json()
         setPrintRecords(recordsData.records || [])
       }
 
-      // Fetch printing settings
-      const settingsResponse = await fetch(`/api/admin/printing/settings-supabase`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      
       if (settingsResponse.ok) {
         const settingsData = await settingsResponse.json()
         setSettings({
@@ -79,7 +79,7 @@ export default function PrintingManagement() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [getIdToken])
 
   const handleUpdateSettings = async () => {
     const price = parseFloat(newPrice)
@@ -191,28 +191,26 @@ export default function PrintingManagement() {
     }
   }
 
-  // Calculate statistics
-  const totalPending = printRecords
-    .filter(r => r.status === "pending")
-    .reduce((sum, r) => sum + r.total_price, 0)
-
-  const totalPaid = printRecords
-    .filter(r => r.status === "paid")
-    .reduce((sum, r) => sum + r.total_price, 0)
-
-  const totalSheetsPending = printRecords
-    .filter(r => r.status === "pending")
-    .reduce((sum, r) => sum + r.sheets, 0)
-
-  const totalSheetsPaid = printRecords
-    .filter(r => r.status === "paid")
-    .reduce((sum, r) => sum + r.sheets, 0)
+  // Memoize statistics
+  const stats = useMemo(() => {
+    const pending = printRecords.filter(r => r.status === "pending")
+    const paid = printRecords.filter(r => r.status === "paid")
+    
+    return {
+      totalPending: pending.reduce((sum, r) => sum + r.total_price, 0),
+      totalPaid: paid.reduce((sum, r) => sum + r.total_price, 0),
+      totalSheetsPending: pending.reduce((sum, r) => sum + r.sheets, 0),
+      totalSheetsPaid: paid.reduce((sum, r) => sum + r.sheets, 0),
+      pendingCount: pending.length,
+      paidCount: paid.length
+    }
+  }, [printRecords])
 
   // Filter records based on status
-  const filteredRecords = printRecords.filter(record => {
-    if (statusFilter === "all") return true
-    return record.status === statusFilter
-  })
+  const filteredRecords = useMemo(() => {
+    if (statusFilter === "all") return printRecords
+    return printRecords.filter(record => record.status === statusFilter)
+  }, [printRecords, statusFilter])
 
   // Pagination
   const totalPages = Math.ceil(filteredRecords.length / recordsPerPage)
@@ -254,10 +252,10 @@ export default function PrintingManagement() {
             <div>
               <p className="text-sm opacity-90">Total Pendientes</p>
               <p className="text-2xl font-bold">
-                ${totalPending.toFixed(2)}
+                ${stats.totalPending.toFixed(2)}
               </p>
               <p className="text-xs opacity-75">
-                {totalSheetsPending} hojas
+                {stats.totalSheetsPending} hojas
               </p>
             </div>
           </div>
@@ -269,10 +267,10 @@ export default function PrintingManagement() {
             <div>
               <p className="text-sm opacity-90">Total Pagados</p>
               <p className="text-2xl font-bold">
-                ${totalPaid.toFixed(2)}
+                ${stats.totalPaid.toFixed(2)}
               </p>
               <p className="text-xs opacity-75">
-                {totalSheetsPaid} hojas
+                {stats.totalSheetsPaid} hojas
               </p>
             </div>
           </div>
@@ -284,7 +282,7 @@ export default function PrintingManagement() {
             <div>
               <p className="text-sm opacity-90">Registros Pendientes</p>
               <p className="text-2xl font-bold">
-                {printRecords.filter(r => r.status === "pending").length}
+                {stats.pendingCount}
               </p>
               <p className="text-xs opacity-75">
                 Por procesar
@@ -299,7 +297,7 @@ export default function PrintingManagement() {
             <div>
               <p className="text-sm opacity-90">Registros Pagados</p>
               <p className="text-2xl font-bold">
-                {printRecords.filter(r => r.status === "paid").length}
+                {stats.paidCount}
               </p>
               <p className="text-xs opacity-75">
                 Completados
