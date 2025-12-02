@@ -25,6 +25,9 @@ const AdminNav = memo(function AdminNav({ user, onLogout }: AdminNavProps) {
             <Link href="/admin/payment-requests" className="text-sm hover:text-primary">
               Solicitudes de Pago
             </Link>
+            <Link href="/admin/reports" className="text-sm hover:text-primary">
+              Reportes
+            </Link>
           </div>
 
           {/* Menú General para móvil */}
@@ -45,6 +48,11 @@ const AdminNav = memo(function AdminNav({ user, onLogout }: AdminNavProps) {
                 <DropdownMenuItem asChild>
                   <Link href="/admin/payment-requests" className="w-full">
                     Solicitudes de Pago
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/reports" className="w-full">
+                    Reportes
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
