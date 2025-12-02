@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2, Plus, Users, Trash2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import { format } from "date-fns"
 import { useAuth } from "@/lib/auth-context"
 
@@ -83,7 +83,7 @@ export default function ClientsManagement() {
     }
   }, [clients.length, itemsPerPage, currentPage])
 
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     try {
       const token = await getIdToken()
       if (!token) return
@@ -147,7 +147,7 @@ export default function ClientsManagement() {
         variant: "destructive",
       })
     }
-  }
+  }, [getIdToken, toast])
 
   // Cargar planes de pago al montar el componente
   useEffect(() => {

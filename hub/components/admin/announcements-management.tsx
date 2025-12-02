@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Loader2, Send, Trash2, AlertCircle, Info, Wrench, PartyPopper } from "lucide-react"
@@ -45,15 +45,12 @@ export default function AnnouncementsManagement() {
     fetchAnnouncements()
   }, [])
 
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = useCallback(async () => {
     try {
       setFetchLoading(true)
       const token = await getIdToken()
       
-      console.log('🔍 Token obtenido con getIdToken:', token ? '✅' : '❌')
-      
       if (!token) {
-        console.log('❌ No se pudo obtener token')
         toast({
           title: "Error de autenticación",
           description: "No se pudo obtener el token de autenticación",
@@ -68,9 +65,6 @@ export default function AnnouncementsManagement() {
         }
       })
 
-      console.log('Response status:', response.status)
-      console.log('Response ok:', response.ok)
-
       if (!response.ok) {
         const errorText = await response.text()
         console.error('Error response:', errorText)
@@ -78,7 +72,6 @@ export default function AnnouncementsManagement() {
       }
 
       const data = await response.json()
-      console.log('Data recibida:', data)
       setAnnouncements(data.announcements || [])
     } catch (error) {
       console.error('Error fetching announcements:', error)
@@ -90,7 +83,7 @@ export default function AnnouncementsManagement() {
     } finally {
       setFetchLoading(false)
     }
-  }
+  }, [getIdToken, toast])
 
   const handleCreateAnnouncement = async () => {
     if (!newAnnouncement.title.trim() || !newAnnouncement.content.trim()) {

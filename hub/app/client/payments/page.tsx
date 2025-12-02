@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { format } from "date-fns"
 
 function PaymentsPage() {
@@ -30,7 +30,7 @@ function PaymentsPage() {
   const [loadingQR, setLoadingQR] = useState(false)
 
   // Calcular próximo período de pago
-  const getNextPaymentPeriod = () => {
+  const nextPayment = useMemo(() => {
     const now = new Date()
     const currentDay = now.getDate()
     const currentMonth = now.getMonth()
@@ -54,11 +54,9 @@ function PaymentsPage() {
     return {
       period: `${monthNames[nextMonth]} ${nextYear}`,
       dueDate: `10 de ${monthNames[nextMonth]} de ${nextYear}`,
-      isOverdue: false // Por defecto no está vencido hasta que se carguen los datos reales
+      isOverdue: false
     }
-  }
-
-  const nextPayment = getNextPaymentPeriod()
+  }, [])
   // Historial de pagos dinámico
   const [paymentHistory, setPaymentHistory] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(true)
